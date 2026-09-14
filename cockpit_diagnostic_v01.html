@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruisr · cockpit Diagnostic v01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --ink:#141820; --panel:#1b2129; --panel2:#222a34; --line:#2e3742;
+  --text:#ece7dd; --muted:#8e97a3; --dim:#5f6873;
+  --amber:#e2a75c; --amber-dim:#8a6432; --green:#7fb98a; --red:#d97b6c;
+  --serif:'Fraunces',Georgia,serif; --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+.app{display:grid;grid-template-columns:230px 1fr 320px;grid-template-rows:56px 1fr;height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:20px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-family:var(--serif);font-weight:400;font-size:20px;margin:0;letter-spacing:.01em}
+header h1 em{color:var(--amber);font-style:italic}
+.meta{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.spacer{flex:1}
+.clock{font-family:var(--mono);font-size:22px;letter-spacing:.04em;display:flex;align-items:center;gap:12px}
+.langbtn{padding:6px 12px;border:1px solid var(--amber-dim);border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--amber);letter-spacing:.08em}
+.langbtn:hover{border-color:var(--amber)}
+.clock button{padding:6px 12px;border:1px solid var(--line);border-radius:6px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.clock button:hover{border-color:var(--amber);color:var(--text)}
+.clock .over{color:var(--red)}
+
+nav{border-right:1px solid var(--line);padding:16px 0;overflow:auto;display:flex;flex-direction:column}
+.nav-title{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);padding:0 20px 8px}
+.phase{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;padding:9px 20px;text-align:left;position:relative;color:var(--muted);width:100%}
+.phase .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);position:relative;z-index:1}
+.phase::before{content:'';position:absolute;left:23px;top:0;bottom:0;width:1px;background:var(--line)}
+.phase:first-of-type::before{top:50%}
+.phase.last::before{bottom:50%}
+.phase .name{font-size:14px}
+.phase .t{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.phase:hover{color:var(--text)}
+.phase.active{color:var(--text);background:var(--panel)}
+.phase.active .dot{background:var(--amber);box-shadow:0 0 0 4px rgba(226,167,92,.18)}
+.phase.done .dot{background:var(--green)}
+.pins{margin-top:auto;padding:16px 0 0;border-top:1px solid var(--line)}
+.pin{display:block;width:100%;text-align:left;padding:8px 20px;color:var(--muted);font-size:14px}
+.pin:hover,.pin.active{color:var(--amber)}
+.warn{margin:16px 20px 0;padding:12px;border:1px solid var(--amber-dim);border-radius:8px;font-size:12.5px;color:var(--muted);line-height:1.45}
+.warn b{color:var(--amber);font-weight:500}
+
+main{overflow:auto;padding:28px 40px 60px;scroll-behavior:smooth}
+.eyebrow{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);margin-bottom:6px}
+h2{font-family:var(--serif);font-weight:400;font-size:34px;margin:0 0 6px;line-height:1.1}
+.goal{color:var(--muted);font-size:15px;margin:0 0 26px;max-width:62ch}
+.goal b{color:var(--text);font-weight:500}
+
+.say{border-left:3px solid var(--amber);padding:12px 18px;margin:14px 0;background:var(--panel);border-radius:0 8px 8px 0;font-family:var(--serif);font-size:18px;line-height:1.45;max-width:70ch}
+.say .lbl{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);margin-bottom:6px}
+.note{color:var(--muted);font-size:14px;margin:8px 0 18px;max-width:66ch}
+.note b{color:var(--text);font-weight:500}
+h3{font-family:var(--sans);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:26px 0 10px}
+
+.qs{list-style:none;margin:0;padding:0;max-width:70ch}
+.qs li{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:start}
+.qs li .box{width:18px;height:18px;border:1.5px solid var(--dim);border-radius:4px;margin-top:3px;cursor:pointer;flex:none}
+.qs li.on .box{background:var(--green);border-color:var(--green)}
+.qs li.on .q{color:var(--dim);text-decoration:line-through}
+.qs .q{font-size:16px;line-height:1.45}
+.qs .q .why{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.qs .q .key{color:var(--amber);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;margin-right:8px}
+
+.check{margin:22px 0;padding:14px 18px;border:1px dashed var(--amber-dim);border-radius:8px;max-width:70ch}
+.check .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);display:block;margin-bottom:4px}
+.check p{margin:0;font-family:var(--serif);font-size:17px}
+
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:12px 0 8px}
+.plan{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column}
+.plan h4{font-family:var(--serif);font-weight:400;font-size:24px;margin:0}
+.plan .tag{font-family:var(--mono);font-size:11px;color:var(--muted);margin:2px 0 12px}
+.plan ul{margin:0;padding:0;list-style:none;font-size:14px}
+.plan li{padding:6px 0;border-top:1px solid var(--line)}
+.plan li.hi{color:var(--amber)}
+.plan .contrast{margin-top:auto;padding-top:12px;font-size:13px;color:var(--muted);border-top:1px solid var(--amber-dim)}
+.plan .contrast b{color:var(--text);font-weight:500}
+.plan.rec{border-color:var(--amber)}
+.ptabs{display:flex;gap:6px;margin:14px 0 10px}
+.ptab{padding:9px 16px;border:1px solid var(--line);border-radius:8px;color:var(--muted);display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.ptab .n{font-family:var(--serif);font-size:19px;color:var(--text)}
+.ptab .p{font-family:var(--mono);font-size:11px}
+.ptab:hover{border-color:var(--amber-dim)}
+.ptab.active{border-color:var(--amber);background:var(--panel)}
+.ptab.active .p{color:var(--amber)}
+.pintro{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 14px;max-width:90ch}
+.pintro>div{background:var(--panel);border-radius:8px;padding:12px 16px;font-size:14px}
+.pintro .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);display:block;margin-bottom:4px}
+.pintro .s{font-family:var(--serif);font-size:16.5px;line-height:1.4}
+.items{max-width:90ch}
+.item{border-top:1px solid var(--line);padding:10px 0}
+.item:last-child{border-bottom:1px solid var(--line)}
+.item .head{display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:start;cursor:pointer;width:100%;text-align:left;padding:2px 0}
+.item .w{display:flex;gap:3px;margin-top:8px}
+.item .w i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.item .w i.on{background:var(--amber)}
+.item .w.w3 i.on{background:var(--amber)}
+.item .name{font-size:15.5px;line-height:1.4}
+.item .name .site{display:block;font-size:12px;color:var(--dim);margin-top:1px}
+.item .arrow{font-family:var(--mono);color:var(--dim);font-size:12px;margin-top:4px}
+.item .body{display:none;grid-template-columns:44px 1fr;gap:14px;margin-top:8px}
+.item.open .body{display:grid}
+.item.open .arrow{color:var(--amber)}
+.item .body .say{margin:6px 0 10px;font-size:17px}
+.item .body .deep{font-size:14px;color:var(--muted);max-width:68ch}
+.item .body .deep b{color:var(--text);font-weight:500}
+.item .body .deep .gt{display:block;margin-top:8px;padding:8px 12px;border-left:2px solid var(--green);color:var(--text)}
+.item .body .deep .gt::before{content:'Exemple · ';font-family:var(--mono);font-size:10.5px;color:var(--green);letter-spacing:.1em;text-transform:uppercase}
+.contrastbox{margin:16px 0 0;padding:14px 18px;border:1px solid var(--amber-dim);border-radius:8px;max-width:90ch;background:var(--panel)}
+.contrastbox .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);display:block;margin-bottom:6px}
+.contrastbox .s{font-family:var(--serif);font-size:17px;line-height:1.45}
+.legend{font-family:var(--mono);font-size:11px;color:var(--dim);margin:6px 0 0}
+details{margin:8px 0;max-width:72ch}
+summary{cursor:pointer;color:var(--amber);font-size:14px;padding:6px 0;list-style:none}
+summary::before{content:'+ ';font-family:var(--mono)}
+details[open] summary::before{content:'– '}
+
+table{border-collapse:collapse;width:100%;max-width:80ch;font-size:14.5px}
+td,th{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);font-weight:400}
+td:first-child{color:var(--muted);width:38%}
+td:last-child{font-family:var(--serif);font-size:16px}
+
+.branch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:12px 0}
+.branch div{background:var(--panel);border-radius:8px;padding:14px;font-size:14px}
+.branch .if{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.branch .then{font-family:var(--serif);font-size:18px;color:var(--amber)}
+
+aside{border-left:1px solid var(--line);background:var(--panel);overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+aside .top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px}
+aside h5{margin:0;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim)}
+aside .copy{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:4px 9px}
+aside .copy:hover{color:var(--amber);border-color:var(--amber)}
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field textarea{background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:7px 9px;font-family:var(--mono);font-size:13px;width:100%;resize:vertical}
+.field input:focus,.field textarea:focus{border-color:var(--amber);outline:none}
+.field.filled input,.field.filled textarea{border-color:var(--amber-dim)}
+.sep{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);margin:10px 0 2px}
+
+.toast{position:fixed;bottom:22px;right:340px;background:var(--amber);color:var(--ink);padding:8px 14px;border-radius:6px;font-family:var(--mono);font-size:12px;opacity:0;transform:translateY(6px);transition:.2s}
+.toast.show{opacity:1;transform:none}
+.kbd{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:1100px){.app{grid-template-columns:200px 1fr 280px}.plans{grid-template-columns:1fr}}
+
+/* v2 additions */
+.tools{display:flex;gap:6px}
+.tools button{font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:4px 9px}
+.tools button:hover{color:var(--amber);border-color:var(--amber)}
+.tools button.danger:hover{color:var(--red);border-color:var(--red)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;width:min(640px,90vw)}
+.mt{font-family:var(--serif);font-size:20px;margin-bottom:10px}
+.mbox textarea{width:100%;min-height:200px;background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:10px;font-family:var(--mono);font-size:12.5px}
+.mb{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.mb button{font-family:var(--mono);font-size:12px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+.mb .mok{background:var(--amber);color:var(--ink);border-color:var(--amber)}
+aside .top{flex-wrap:wrap;gap:6px}
+
+.tpl{margin:12px 0;padding:14px 18px;background:var(--panel);border:1px solid var(--line);border-radius:8px;max-width:72ch;position:relative}
+.tpl .lbl{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);display:block;margin-bottom:6px}
+.tpl pre{margin:0;white-space:pre-wrap;font-family:var(--sans);font-size:14.5px;line-height:1.5;color:var(--text)}
+.tpl .cp{position:absolute;top:10px;right:12px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:3px 8px}
+.tpl .cp:hover{color:var(--amber);border-color:var(--amber)}
+.cap{margin:14px 0;padding:10px 14px;border-left:3px solid var(--green);background:var(--panel);border-radius:0 8px 8px 0;max-width:72ch;font-size:14px;color:var(--muted)}
+.cap .lbl{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--green);margin-bottom:4px}
+.cap b{color:var(--text);font-weight:500}
+.app{grid-template-columns:230px 1fr 360px}
+.modes{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.modes button{padding:6px 14px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.modes button.active{background:var(--amber);color:var(--ink)}
+.rec{margin:0 0 20px;padding:14px 18px;border:1px solid var(--green);border-radius:8px;background:var(--panel);max-width:90ch;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
+.rec .badge{font-family:var(--serif);font-size:26px;color:var(--green);white-space:nowrap}
+.rec .why{font-size:13.5px;color:var(--muted)}
+.rec .why b{color:var(--text);font-weight:500}
+.calque{border-left:3px solid var(--green);padding:10px 16px;margin:10px 0;background:var(--panel);border-radius:0 8px 8px 0;max-width:72ch}
+.calque .lbl{display:block;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--green);margin-bottom:4px}
+.calque .lbl .inf{color:var(--red);margin-left:8px}
+.calque .s{font-family:var(--serif);font-size:16.5px;line-height:1.45}
+.calque .q{font-size:15px;margin:4px 0}
+.calque .q::before{content:'? ';color:var(--green);font-family:var(--mono)}
+.calques-h{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--green);margin:26px 0 6px}
+aside .sel{display:flex;flex-direction:column;gap:3px}
+aside .sel label{font-size:12px;color:var(--muted)}
+aside select{background:var(--ink);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:6px 8px;font-family:var(--mono);font-size:12.5px;width:100%}
+aside select.set{border-color:var(--green)}
+.flags{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;margin:4px 0}
+.flag{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--muted);cursor:pointer;padding:4px 6px;border:1px solid var(--line);border-radius:6px}
+.flag.on{color:var(--text);border-color:var(--green)}
+.flag i{width:10px;height:10px;border-radius:2px;background:var(--line);flex:none}
+.flag.on i{background:var(--green)}
+.recmini{margin:8px 0 4px;padding:10px 12px;border:1px solid var(--green);border-radius:8px;font-size:13px}
+.recmini b{font-family:var(--serif);font-size:20px;color:var(--green);display:block;font-weight:400}
+.pal{font-family:var(--mono);font-size:11px;color:var(--amber);margin-top:4px}
+.gt.ov::before{content:attr(data-l) ' · '!important}
+.gt.inf{border-left-color:var(--amber-dim)}
+.warnbar{font-family:var(--mono);font-size:11px;color:var(--dim);padding:6px 20px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <h1>Cruisr · <em id="hTitle">Diagnostic</em> <span class="meta">v01</span></h1>
+  <span class="meta">Hugo / Greg · 45 min · puis Proposition 30 min</span>
+  <span class="spacer"></span>
+  <span class="meta"><span class="kbd">←</span> <span class="kbd">→</span> phases &nbsp; <span class="kbd">F</span> forfaits &nbsp; <span class="kbd">P</span> proposition &nbsp; <span class="kbd">O</span> objections</span>
+    <div class="clock"><span id="clock">00:00</span><button id="clockBtn">démarrer</button></div>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+<aside>
+  <div class="top"><h5 id="capT">Profil · capture</h5><div class="tools"><button id="pasteBtn">coller le brief</button><button class="copy" id="copyBtn">copier le debrief</button><button id="newBtn" class="danger">nouveau</button></div></div>
+  <div class="tools" style="margin:2px 0 8px"><button id="noteBtn">+ note de modif</button><button id="notesCopy">copier les notes</button><button id="notesClear" class="danger">effacer</button></div>
+  <div id="recmini"></div>
+  <div id="fields"></div>
+</aside>
+</div>
+<div class="toast" id="toast">Copié</div>
+<script>
+// ---------- DATA (v1) ----------
+const L=x=>x;
+const TOOL='diagnostic';
+const tpl=(l,t)=>({type:'tpl',l,t});
+const cap=t=>({type:'cap',t});
+const say = (t,l='Dire')=>({type:'say',t,l});
+const note = t=>({type:'note',t});
+const qs = (items)=>({type:'qs',items});
+const check = t=>({type:'check',t});
+const h3 = t=>({type:'h3',t});
+const html = (t)=>({type:'html',t});
+
+
+const phases = [
+ {id:'brief',name:'Brief',t:'2 min',title:'Lire le brief, régler le profil',goal:'Deux minutes avant d\'entrer. Ce que Sabrina a capturé se colle à droite. Ce qu\'elle n\'a pas eu, tu le confirmes en phase 2-3 — tu ne le redemandes pas.',blocks:[
+  qs([
+   {q:'« Coller le brief » (en haut à droite) avec le brief Fit Call copié dans ClickUp — menus, drapeaux et champs se remplissent',key:'du brief SDR'},
+   {q:'Compléter ce que le parseur n\'a pas pris : maturité finance (déduite de « chiffres reçus quand »), trajectoire si connue'},
+   {q:'Relire le pain dans ses mots — c\'est ce que tu reformules en phase 4'},
+   {q:'Lire les calques actifs dans Ouverture et Forfaits — un hook, deux questions, les items qui montent'},
+   {q:'Vérifier le forfait recommandé et l\'ancrage prix — tu les nommes en phase 7, pas avant'},
+  ]),
+  note('<b>Pas vendre.</b> Trois livrables : il nomme son pain lui-même · paramètres complets pour chiffrer · Proposition bookée en personne sous 48h avec un devoir.'),
+ ]},
+ {id:'ouverture',name:'Ouverture',t:'2 min',title:'Cadrer',goal:'Il sait à quoi s\'attendre. Pas de surprise sur le fait qu\'on ne donne pas de prix aujourd\'hui.',blocks:[
+  say('Merci de me recevoir. Le but aujourd\'hui c\'est simple : comprendre comment ta business roule, puis te montrer à haut niveau ce qu\'on fait. Si ça fait du sens, on se revoit avec un prix précis. Ça te va ?'),
+ ]},
+ {id:'business',name:'La business',t:'8 min',title:'Lui, pas moi',goal:'Il parle. Je note. La question 3-5 ans ouvre tout.',blocks:[
+  qs([
+   {q:'Raconte-moi la business. Depuis le début, comment ça a évolué ?'},
+   {q:'Vous êtes combien dans l\'équipe, incluant toi ?'},
+   {q:'Grosso modo, revenus annuels ?',why:'Si hésitation : « 500 ? 1M ? Plus ? Juste pour que je calibre. »'},
+   {q:'Si on se projette dans 3-5 ans, où est-ce que tu veux être avec cette compagnie-là ? Encore propriétaire ? Vendue ? Plus grosse ?',key:'la question d\'or',why:'Puis je me tais.'},
+   {q:'Est-ce que doubler ça t\'intéresse, ou t\'es plus dans stabilité, moins de charge sur toi ?',why:'Selon sa réponse.'},
+  ]),
+  note('Écouter pour : ce qui le fatigue · ce qu\'il fait lui-même qu\'il ne devrait pas · l\'inventaire qui dort · les chiffres qu\'il n\'a pas.'),
+ ]},
+ {id:'finance',name:'La finance',t:'6 min',title:'La structure actuelle',goal:'Tout ce qu\'il faut pour chiffrer. Cocher au fur et à mesure.',blocks:[
+  qs([
+   {q:'Qui fait la tenue de livres en ce moment ?'},
+   {q:'Interne ou externe ? Temps plein, partiel ? Ça te coûte combien par mois ou par année, à peu près ?'},
+   {q:'Depuis quand ?'},
+   {q:'Ton comptable de fin d\'année, c\'est qui ? Il fait juste les états financiers ou plus ?'},
+   {q:'Tes chiffres du mois, tu les as quand ?',key:'question pain'},
+   {q:'Quel système ? QuickBooks, Sage, Acomba, Excel ?'},
+   {q:'TPS/TVQ, tu déclares mensuel, trimestriel, annuel ?'},
+   {q:'Fin d\'année financière ?'},
+   {q:'Combien de comptes de banque, cartes de crédit dans la business ?'},
+   {q:'Tu te paies un salaire ? À part le profit ?'},
+   {q:'Qui d\'autre est dans la décision ? Conjoint·e, associé, ta commis ?',why:'Régler « Décideur ».'},
+  ]),
+ ]},
+ {id:'reformuler',name:'Reformuler',t:'3 min',title:'Ses mots, dans ma bouche',goal:'Il entend son pain résumé. Il confirme ou corrige. Les deux sont bons.',blocks:[
+  say('Ce que j\'entends : [depuis X ans, tu connais ton métier par cœur], mais [ses mots : chiffres une fois par année / il fait tout / il ne sait pas ce que X vaut]. Je suis dans le champ ?','Gabarit — ses mots, pas les miens'),
+  check('Est-ce que ça te dérange, ou tu vis bien avec ça ?'),
+  note('Si « je vis bien avec » → creuser : <b>« OK. Puis si demain tu voulais vendre, ou prendre un mois de vacances, ça ressemble à quoi ? »</b>'),
+ ]},
+ {id:'cruisr',name:'C\'est qui Cruisr',t:'4 min',title:'C\'est qui Cruisr',goal:'Arrive après le pain. Jamais avant. Choisir le background selon ce qu\'il a dit — pas tout.',blocks:[
+  say('Cruisr, on l\'a bâti pour la PME qui n\'a pas de département des finances. Entre 500K et 10M, t\'es trop gros pour piloter au feeling, trop petit pour engager un contrôleur à 90K. Résultat : les chiffres arrivent une fois par année, en retard, et tu décides sans. Nous on comble ce trou-là.','Pourquoi on existe · 30 s'),
+  say('On prend ta fonction finance au complet, en abonnement mensuel : tenue de livres, clôture de fin de mois, paiement des fournisseurs et des taxes, puis si tu veux, le pilotage — budget, tableau de bord, prévisions. Toi tu approuves, nous on exécute.','Ce qu\'on fait · 15 s'),
+  say('Deux morceaux. Un, notre plateforme : elle se connecte à ta banque et ton système comptable, elle catégorise, elle concilie, elle émet les paiements que tu approuves. C\'est ce qui nous permet de faire le travail d\'un commis pour une fraction du prix. Deux, l\'équipe : chaque livraison est révisée par une personne avant de t\'arriver, et le mois se verrouille quand tu approuves. Le logiciel fait le volume, la révision garantit que c\'est bon. Ce n\'est pas un logiciel que tu opères — c\'est un service. T\'as rien à apprendre.','Plateforme + équipe · 45 s'),
+  say('Oui, dans la plateforme, pour catégoriser et détecter les anomalies. Mais chaque livraison passe par une révision humaine avant de vous arriver, et le mois se verrouille quand vous approuvez.','Si « c\'est de l\'IA ? »'),
+  h3('Background — un seul, selon ce qu\'il a dit'),
+  html(`<table>
+   <tr><td>Hugo</td><td>« Mon associé Hugo a monté une business de service à 350 employés au Québec. Il a fait le CFO pour des PME, puis a fini par en acheter une — Vivarium, extermination, passée de 1M à 4M en deux ans avec la méthode qu'on applique. »</td></tr>
+   <tr><td>Greg</td><td><span style="color:var(--red)">[ta phrase — à compléter]</span></td></tr>
+   <tr><td>Le modèle</td><td>« Ce modèle-là — prendre une business de métier, mettre les processus et les chiffres en place, la faire croître — on l'a fait cinq fois. On ne l'a pas inventé. On l'applique. »</td></tr>
+  </table>`),
+  say('On a des clients de 500K et des clients qui nous paient 11-12K par mois parce qu\'ils font des dizaines de millions. Même méthode, pas le même prix. Toi, t\'es dans la gamme où ça coûte à peu près ce que te coûte déjà ta commis.','Calibrer · 30 s'),
+  say('Cruisr, c\'est Hugo et moi, à Montréal. On a bâti ça parce qu\'on a vu la même chose dans chaque PME qu\'on a accompagnée : le proprio connaît son métier par cœur et pilote ses finances à l\'aveugle. On sert des PME québécoises de 500K à plusieurs dizaines de millions. On est mois-à-mois — si on n\'est pas bons, tu pars.','La story — si « c\'est qui, vous ? »'),
+  h3('Ce qu\'on ne fait pas — dit d\'avance'),
+  qs([
+   {q:'Les états financiers de fin d\'année et les impôts, c\'est ton comptable externe. On lui envoie un dossier propre.'},
+   {q:'On ne compte pas ton inventaire physique. On s\'assure qu\'il est bien comptabilisé.'},
+   {q:'On ne touche jamais à ton argent. Toi t\'approuves chaque paiement.'},
+  ]),
+  say('Onboarding de deux heures, en personne. Après, un canal — Slack ou courriel, ton choix — où on te pose nos questions chaque semaine. Toi, ça te prend 15 minutes par semaine. Mois-à-mois, pas de contrat annuel.','Comment on travaille · 30 s'),
+  check('Est-ce que ça clarifie c\'est qui on est ? Des questions avant que je te montre les plans ?'),
+ ]},
+ {id:'forfaits',name:'Les forfaits',t:'10 min',title:'Trois plans, en escalier',goal:'Chaque ligne = un bénéfice. Points ambre = poids, base + calques. Ouvrir une ligne seulement s\'il creuse.',blocks:[
+  say('Je te montre les trois plans à haut niveau, puis tu me dis ce qui fait du sens. Les prix sur le site c\'est un plancher, à partir de — le prix réel dépend de ta business. Je te l\'apporte à la Proposition.','Cadrer avant'),
+  {type:'plans'},
+  check('À haut niveau, ça te parle ? Où tu te vois là-dedans ?'),
+ ]},
+ {id:'positionner',name:'Positionner',t:'2 min',title:'Nommer le forfait que j\'entends',goal:'Avant qu\'il choisisse. La grille justifie la recommandation, elle ne fait pas choisir.',blocks:[
+  html(`<div class="branch">
+   <div><div class="if">Si pain = chiffres en retard · inventaire flou · il fait tout</div><div class="then">Controller</div><p style="margin:8px 0 0;color:var(--muted)">« Moi ce que j'entends, c'est Controller. L'inventaire, c'est là que se cache ta marge. »</p></div>
+   <div><div class="if">Si pain = vendre · croître · lâcher prise</div><div class="then">CFO</div><p style="margin:8px 0 0;color:var(--muted)">« C'est CFO que j'entends. Pas parce que c'est le plus cher — parce que ton besoin est là. »</p></div>
+   <div><div class="if">Si déjà bien structuré, veut juste plus vite</div><div class="then">Books</div><p style="margin:8px 0 0;color:var(--muted)">Rare. Ne pas forcer plus haut.</p></div>
+  </div>`),
+ ]},
+ {id:'close',name:'Close · Proposition',t:'5 min',title:'Sortir avec une date',goal:'Proposition en personne, datée, devoir donné. Invitation envoyée devant lui.',blocks:[
+  say('Voici ce que je propose. J\'ai ce qu\'il me faut pour te chiffrer précisément. On se revoit en personne, 30 minutes, lundi ou mardi. Je t\'arrive avec le prix exact et ce que ça inclut, ligne par ligne.'),
+  say('D\'ici là, deux choses de ton côté : combien te coûte ta compta au total par année — commis plus comptable externe — puis la liste de ce que ta commis fait exactement. Comme ça on compare des pommes avec des pommes.','Le devoir'),
+  say('Je te donne un ordre de grandeur, mais je ne veux pas te dire un chiffre à moitié bon. Ça se situe dans ce que tu paies probablement déjà ta commis. Je te confirme [date].','Si il demande le prix maintenant'),
+  say('On lui enlève des tâches. Tu peux la mettre sur autre chose.','Si lien affectif avec la commis — jamais « remplacer »'),
+  h3('Après — dans les 10 minutes'),
+  tpl('Courriel post-Diagnostic — le devoir écrit','Objet : notre rencontre — prochaine étape [date rdv]\n\nBonjour [prénom],\n\nMerci pour le temps aujourd\'hui. Ce que j\'ai entendu : [pain].\n\nOn se revoit [date rdv]. J\'arrive avec le prix exact et ce que ça inclut, ligne par ligne.\n\nDe ton côté d\'ici là : [devoir]. Comme ça on compare des pommes avec des pommes.\n\nHugo / Greg'),
+  qs([
+   {q:'Tâche ClickUp : Proposition à [date rdv], grille personnalisée à préparer, assignée au closer'},
+   {q:'D2D seulement : Zoho Forms avec Code visite dans l\'heure'},
+   {q:'Copier le debrief → ClickUp, tâche du prospect'},
+   {q:'Grille de prix personnalisée prête pour la Proposition — pas de surprise « à partir de »'},
+  ]),
+ ]},
+ {id:'proposition',name:'Proposition',t:'30 min',title:'Le prix exact, puis la signature',goal:'Deuxième rencontre. En personne. Décideurs présents. Grille personnalisée prête. On sort signé, ou avec une date de réévaluation datée — jamais avec un « je vais y penser ».',blocks:[
+  say('J\'ai pris le temps de réfléchir à notre discussion. J\'imagine que t\'as fait la même chose.','1 · Ouverture'),
+  say('[Le chiffre qui l\'honore : X de revenus en Y ans, 20 ans de business, une équipe qui tient…] C\'est le genre de client qu\'on prend.','2 · Valoriser — une phrase vraie'),
+  say('Le plus gros frein, ce n\'est pas [le marché / la main-d\'œuvre]. C\'est de te structurer pour que ça grossisse sans que le bateau coule de partout. Je ne pense pas que [plan en dessous] soit le bon plan pour toi. Il te faut [plan recommandé]. Pas parce que c\'est le plus cher — parce que ton besoin est là.','3 · Rappel du diagnostic → recommandation'),
+  say('On ne joue jamais sur les prix, donc on ne va pas jouer. Ça vaut plus que ça, on est convaincus. Je n\'ai pas envie d\'un jeu de négociation — on veut le mandat, je te le dis upfront. Voici exactement ce que ça coûte et ce que ça inclut.','4 · Position sur le prix'),
+  cap('<span class="lbl">Partager la grille</span>Le plan recommandé en premier, chaque ligne du site = un bénéfice (onglet Forfaits). Puis le plan en dessous, pour le contraste. Frais d\'onboarding : un mois de plus, sauf promo en cours. Pas de troisième plan sauf s\'il le demande.'),
+  say('Voici ce que je propose. On part sur [plan recommandé] à [prix]. Le premier mois, on te livre en plus [un ou deux éléments du plan au-dessus : budget + tableau de bord]. Le jour 60, on se rassoit — je mets la date maintenant — et si tu vois la valeur, on monte à [plan au-dessus] à [prix]. Sinon tu restes où tu es. Mois-à-mois, pas de contrat annuel.','5 · Réduction du risque — le client opte pour monter, jamais pour descendre'),
+  cap('<span class="lbl">Pourquoi dans ce sens</span>Afro Divine a refusé trois fois « essaie le gros, on te rétrograde si t\'aimes pas ». Il avait peur de rester pogné pendant qu\'il est à Toronto. Facturer le plan qu\'il veut, montrer la valeur du suivant, le laisser monter. Même démonstration, zéro friction de sortie.'),
+  h3('Objections — une réponse, puis on avance'),
+  html(`<table><tr><th>Il dit</th><th>Je réponds</th></tr>
+  <tr><td>« On veut y aller graduel, on ne vous connaît pas. »</td><td>« Parfait. On part sur [plan en dessous]. Et on met une date, pas un mois flou : le [date à 60 jours], on regarde ensemble si on monte. » Puis on avance. Deux non = on prend le plan qu'il veut.</td></tr>
+  <tr><td>« Les prix ne sont pas ceux du site. »</td><td>« Le site dit à partir de. C'est le plancher pour une business plus petite que la tienne. Le prix dépend de la taille et de la complexité — c'est pour ça qu'on s'est vus avant de le donner. »</td></tr>
+  <tr><td>« C'est cher. »</td><td>« Comparé à quoi ? Ta commis te coûte [X]. Un contrôleur, 80-90K. Ici tu as les deux pour [prix]. Et si au mois 1 tu ne vois pas la valeur, tu pars. »</td></tr>
+  <tr><td>« Il faut que j'en parle à [commis / associé / conjoint]. »</td><td>Si prévu : « Il aurait dû être là aujourd'hui — on peut l'appeler maintenant ? » Sinon : « Parfait. Je t'envoie le contrat aujourd'hui, et on se parle [date dans 48h], 10 minutes, pour la signature. »</td></tr>
+  <tr><td>« J'ai déjà quelqu'un / j'embauche quelqu'un la semaine prochaine. »</td><td>« Il ne faut pas payer en double. Cette personne fait quoi exactement ? » Puis tracer le périmètre : les commandes, l'accueil, oui. La compta, c'est nous.</td></tr>
+  </table>`),
+  h3('Collecte contrat — pendant que le contrat se génère'),
+  qs([
+   {q:'Nom légal exact (REQ) vs nom commercial — les deux'},
+   {q:'Nom du signataire, épelé. Titre. Courriel.'},
+   {q:'Nombre de comptes de banque et de cartes de crédit'},
+   {q:'Comptabilité à jour jusqu\'à quand ? Système ?'},
+   {q:'Qui fait les livres aujourd\'hui, à quel coût → « il ne faut pas la payer en double », périmètre clair',key:'doublon'},
+   {q:'Fin d\'année financière. Fréquence TPS/TVQ.'},
+   {q:'Inventaire ? Paie — combien d\'employés ? Prêts ?'},
+   {q:'DocuSign ou papier ?'},
+  ]),
+  say('Je génère le contrat maintenant, ça prend deux, trois minutes. Tu peux aller faire autre chose, je reste en ligne. … Tu peux vérifier tes courriels ? Il est là ? Parfait.','6 · Signature en direct'),
+  say('Prochaines étapes : je t\'envoie aujourd\'hui la liste de ce qu\'il nous faut pour l\'onboarding. On se bloque deux heures [date, sous 7 jours] pour le faire. Le mois prochain, tu as tes premiers chiffres. Et si tu connais des entrepreneurs qui vivent la même chose : chaque client que tu nous réfères et qui signe, on te fait un chèque d\'une mensualité.','7 · Onboarding + référencement'),
+  cap('<span class="lbl">Ne pas</span>Pitcher le même mécanisme trois fois · présenter un troisième plan · laisser partir sans date · dire « je vais y penser » à sa place.'),
+ ]},
+];
+
+
+const pins = {
+ prix:{title:'Module · Prix',goal:'Le prix appartient à la Proposition. Au Diagnostic, on ancre, on ne chiffre pas.',blocks:[
+  say('Je te donne un ordre de grandeur, mais je ne veux pas te dire un chiffre à moitié bon. Ça se situe dans ce que tu paies probablement déjà ta commis. Le prix exact, ligne par ligne, c\'est la prochaine rencontre — et c\'est pour ça qu\'on la fait.','Si « c\'est combien ? » avant la phase 7'),
+  html(`<table><tr><th>Revenus</th><th>Ancrage à dire</th><th>Repères (pour toi)</th></tr>
+  <tr><td>&lt; 1 M$</td><td>« ce que te coûte ta commis »</td><td>Books plancher 495 · Controller plancher 1 295 · CFO non offert, séances 500 $</td></tr>
+  <tr><td>1 – 1,5 M$</td><td>« ce que te coûte ta commis »</td><td>Controller · CFO éligible dès 1M</td></tr>
+  <tr><td>1,5 – 6 M$</td><td>« un contrôleur, 80-90K, pour une fraction »</td><td>Controller ou CFO (plancher 3 600) · taxes trimestrielles</td></tr>
+  <tr><td>6 M$ +</td><td>« une équipe finance — contrôleur + commis »</td><td>CFO · taxes mensuelles · clients à 10-12K/mois existent</td></tr></table>`),
+  cap('<span class="lbl">Règles</span>Le site = plancher, le dire au Diagnostic. Onboarding = un mois de plus, sauf promo. On ne joue jamais sur le prix, on joue sur le risque : mois-à-mois, montée au jour 60, remboursement mois 1 (à valider avec Hugo avant de le promettre).'),
+ ]},
+ onboarding:{title:'Module · Onboarding',goal:'Trois phrases pour répondre à « ça se passe comment après ? ». Le détail est à valider avec Hugo.',blocks:[
+  say('Deux heures ensemble, en personne ou en visio, dans les sept jours après la signature. Avant, tu reçois une liste courte de ce qu\'il nous faut. Après, on documente tout de ton côté, et tes premiers chiffres sortent le mois suivant. Toi : deux heures une fois, puis quinze minutes par semaine.','Les trois phrases'),
+  h3('La liste envoyée le jour de la signature — à valider Hugo'),
+  qs([{q:'Accès au système comptable (QuickBooks, Sage, Acomba…)'},{q:'Relevés bancaires et cartes de crédit, 12 derniers mois'},{q:'Derniers états financiers de fin d\'année + coordonnées du CPA'},{q:'Dernières déclarations TPS/TVQ et DAS'},{q:'Liste des fournisseurs récurrents, prêts, baux'},{q:'Registre de paie ou accès au fournisseur de paie'},{q:'Accès à la plateforme de paiement — approbations : qui, combien'}]),
+  cap('<span class="lbl">Qui</span>Controller : Greg ou Hugo. CFO : Hugo. Deux heures suffisent pour Controller ; CFO commence par ces deux heures puis une session budget.'),
+ ]},
+ objections:{title:'Objections probables',goal:'Une réponse par objection. Pas de débat.',blocks:[html(`<table>
+  <tr><th>Il dit</th><th>Je réponds</th></tr>
+  <tr><td>« Ma commis fait ça depuis des années, ça marche. »</td><td>« Je ne doute pas. La question c'est pas si ça marche, c'est ce que tu fais avec. Tes chiffres du mois, tu les as quand ? »</td></tr>
+  <tr><td>« C'est combien ? »</td><td>Ordre de grandeur ancré sur la commis. Prix exact à la Proposition.</td></tr>
+  <tr><td>« Je suis trop petit pour ça. »</td><td>« C'est exactement pour ça qu'on l'a bâti. La structure d'une business de 20M, dans une business de [X]. Pas de département finance à embaucher. »</td></tr>
+  <tr><td>« J'ai pas le temps de changer. »</td><td>« Deux heures d'onboarding, puis 15 minutes par semaine pour répondre à nos questions. Le reste, tu ne le fais plus. »</td></tr>
+  <tr><td>« Vous avez accès à mon compte ? »</td><td>« Non. Plateforme de paiement, toi t'approuves, trace d'audit, on ne touche jamais à l'argent. »</td></tr>
+  <tr><td>« Personne peut faire ce que je fais. »</td><td>« Demain tu te fais frapper par un autobus, il y a plus de business. Les meilleurs entrepreneurs se rendent inutiles dans leur entreprise. Ça commence par les chiffres. »</td></tr>
+  <tr><td>« Je vais y penser. »</td><td>« Parfait. C'est pour ça qu'on se revoit [date] avec un prix précis. Tu penseras avec les vrais chiffres. »</td></tr>
+ </table>`)]},
+ cred:{title:'Banque de crédibilité',goal:'Sujet → une preuve. Au moment où le sujet arrive. Pas une liste.',blocks:[html(`<table>
+  <tr><th>Sujet</th><th>Preuve</th></tr>
+  <tr><td>Main-d'œuvre, employés instables</td><td>Hugo : business de service à 350 employés. « Je connais ces business-là par cœur. »</td></tr>
+  <tr><td>Croissance / doubler</td><td>Vivarium : 3 techniciens → 25 employés, 1M → 4M en 2 ans.</td></tr>
+  <tr><td>Prisonnier de sa business</td><td>Vivarium : « pars en vacances sans téléphone ». SOP, 20/80.</td></tr>
+  <tr><td>Vendre un jour / valorisation</td><td>Hugo a acheté Vivarium. « Je sais ce qu'un acheteur regarde. » Salaire du président → profit réel.</td></tr>
+  <tr><td>Inventaire, marge</td><td>« Un tissu acheté en lot en 2019 et encore en rayon, ça coûte quelque chose. » Controller comptabilise le COGS.</td></tr>
+  <tr><td>Sécurité de l'argent</td><td>Plateforme, approbation client, trace d'audit. Jamais accès aux fonds.</td></tr>
+  <tr><td>« Vous êtes gros ? »</td><td>Clients de 500K à des dizaines de millions. Certains paient 11-12K/mois.</td></tr>
+  <tr><td>Prix</td><td>Ancré sur sa commis. « Comme si t'avais trois employés pour le prix d'un. »</td></tr>
+  <tr><td>Fiabilité</td><td>Révision interne avant chaque livraison, période verrouillée. Clôture en 10 jours ouvrables.</td></tr>
+  <tr><td>Engagement</td><td>Mois-à-mois. Pas de contrat annuel.</td></tr>
+  <tr><td>Réseau / références</td><td>Une mensualité par client référé signé.</td></tr>
+ </table>`)]},
+ salaire:{title:'Module · Salaire du président',goal:'Déclencheur : il se paie sous le marché, ou il dit « je m\'en fous de l\'argent ».',blocks:[
+  say('Si demain matin tu décidais de faire autre chose et que tu devais engager quelqu\'un pour faire ta job, tu penses que tu trouverais quelqu\'un à ce salaire-là ?'),
+  say('Non ? Alors pourquoi toi tu acceptes ? C\'est pas une question de valeurs. Aujourd\'hui t\'as un chapeau d\'actionnaire et un chapeau d\'employé. En tant qu\'actionnaire, t\'engages quelqu\'un pour rouler ta business. Cette personne-là, c\'est quoi son salaire ?'),
+  say('Et si un jour tu vends, l\'acheteur va faire ce calcul-là : tu fais 100K de profit, mais il faut mettre quelqu\'un pour rouler la business. Ça coûte 120K. Tu fais plus 100K, tu fais 40K. Il va te valoriser sur le 40K.'),
+ ]},
+};
+
+
+
+const plans=[
+ {id:'books',name:'Books',price:'site : à partir de 495 $/mois',
+  one:'Tes livres tenus chaque jour, livrés chaque mois. La clôture, c\'est toi qui la fais.',
+  who:'Celui qui a déjà un contrôleur ou un CPA actif et veut juste que la première ligne aille plus vite. Rare chez un commerce de 20 ans sans département finance.',
+  items:[
+   {id:'b1',w:2,n:'Chaque transaction catégorisée chaque jour, selon un plan comptable normalisé',
+    say:'Chaque jour, chaque transaction de ta banque et de tes cartes est classée au bon endroit. Pas une fois par trimestre dans une pile.',
+    deep:'<b>Plan comptable normalisé</b> = la même structure que ce qu\'un CPA, une banque ou un acheteur s\'attend à lire. C\'est ce qui rend tes mois comparables entre eux.'},
+   {id:'b2',w:3,n:'Comptes bancaires et cartes de crédit conciliés',
+    say:'Ce qui est dans tes livres égale ce qui est dans ta banque. Chaque mois, prouvé, à la cenne.',
+    deep:'C\'est la fondation. Si ça ne tient pas, rien d\'autre ne vaut quelque chose — ni le profit, ni le bilan, ni ce que ton CPA produit. C\'est aussi ce qui manque le plus souvent quand on arrive chez un client : « ça balance à peu près ».'},
+   {id:'b3',w:2,n:'Une boîte d\'exceptions hebdomadaire — « nous comptabilisons ainsi, sauf si vous vous y opposez »',
+    say:'Une fois par semaine, on te montre les transactions qu\'on n\'est pas certains. On te dit comment on va les classer. Tu dis rien, on le fait. Dix minutes par semaine, max.',
+    deep:'La charge est inversée : ce n\'est pas toi qui nous expliques, c\'est nous qui proposons et toi qui corriges si besoin. C\'est ce qui fait que ton temps tombe à presque zéro. Répondre à « c\'est pour quoi ce 340 $ chez Uline ? » c\'est tout ce qu\'on te demande.'},
+   {id:'b4',w:3,n:'Un état des résultats et un bilan, livrés chaque mois, avec un sommaire en 3 points',
+    say:'Le 10 du mois, t\'as tes deux états, plus trois phrases : ce qui a monté, ce qui a descendu, ce qu\'il faut regarder.',
+    deep:'<b>Le sommaire est le vrai produit.</b> L\'entrepreneur ne lit pas un état des résultats, il lit les trois points. On écrit pour toi, pas pour un comptable.'},
+   {id:'b5',w:1,n:'Un rapport des éléments ouverts — ce qui reste à résoudre',
+    say:'Ce qui reste à régler de ton côté : une facture qu\'on n\'a pas, un fournisseur sans reçu. Une liste courte, pas un roman.',
+    deep:'Sert à ce que rien ne traîne jusqu\'à la fin d\'année. Si la liste est vide, tu ne reçois rien.'},
+   {id:'b6',w:2,n:'Un rapport d\'anomalies et de fraude',
+    say:'Double paiement, abonnement oublié, transaction inhabituelle sur ta carte — on le voit et on te le dit le jour même.',
+    deep:'Exemple vécu chez un client : facture frauduleuse détectée, appel à la carte de crédit avant que ça se répète. Ce n\'est pas un audit, c\'est une vigilance mensuelle qu\'un commis en temps partiel n\'a pas le temps de faire.'},
+   {id:'b7',w:2,n:'Une trousse prête à présenter à un prêteur',
+    say:'Si tu veux une marge de crédit ou financer un achat, le dossier est prêt. Pas trois semaines à courir après ton comptable.',
+    deep:''},
+   {id:'b8',w:2,n:'Les feuilles de travail de fin d\'exercice remises à votre CPA',
+    say:'Ton CPA reçoit un dossier propre, concilié, avec les feuilles de travail. Il passe moins d\'heures dessus, donc tu paies moins.',
+    deep:'Argument concret pour compenser une partie du prix : la facture CPA baisse quand le dossier arrive fait. On ne remplace pas le CPA. On lui rend la job facile.'},
+  ],
+  contrast:{lbl:'Non inclus — c\'est le contraste qui fait monter',s:'« Avec Books, tes livres sont propres. Mais la clôture de fin de mois — charges à payer, amortissement, valider que le mois est vraiment fermé — c\'est toi ou ton contrôleur qui la fais. Si t\'as pas de contrôleur, c\'est personne. C\'est pour ça que pour toi je pense Controller. »'}},
+ {id:'controller',name:'Controller',price:'site : à partir de 1 295 $/mois · recommandé',
+  one:'Tout Books, plus une clôture complète, prête à approuver. Tu approuves, on verrouille.',
+  who:'La PME sans département finance qui veut des chiffres fermés chaque mois sans embaucher un contrôleur. C\'est le cas si le pain est inventaire ou paie + retard + il fait tout.',
+  items:[
+   {id:'c1',w:3,n:'Un dossier de clôture terminé livré au 10e jour ouvrable, avec un sommaire en 3 points',
+    say:'Le 10e jour ouvrable, ton mois est fermé. Pas des chiffres bruts — un mois révisé, que tu approuves, et que plus personne ne peut changer sans trace.',
+    deep:'C\'est la ligne qui sépare « tenir des livres » de « faire de la comptabilité ». <b>Fermé</b> veut dire qu\'un acheteur, une banque ou ton CPA peut s\'appuyer dessus. Aujourd\'hui, ses chiffres bougent probablement jusqu\'en mars de l\'année suivante.'},
+   {id:'c2',w:2,n:'Charges à payer, amortissement et revenus reportés comptabilisés',
+    say:'La facture d\'électricité de mars qui arrive en avril, elle va dans mars. Ton équipement s\'amortit. Résultat : le profit du mois est le vrai profit du mois, pas un hasard de timing.',
+    deep:'Sans ça, un mois a l\'air excellent parce que trois factures n\'étaient pas arrivées, et le suivant a l\'air catastrophique. Il ne peut pas se comparer à lui-même.'},
+   {id:'c3',w:2,n:'Paie et prêts conciliés, remises gouvernementales rapprochées',
+    say:'Ce que t\'as payé en paie et en DAS correspond à ce que tu déclares. Ton prêt dans les livres égale le solde à la banque. Zéro surprise en fin d\'année.',
+    deep:'Les écarts de DAS, c\'est des pénalités et des lettres de Revenu Québec. Le rapprochement mensuel les attrape à 200 $ au lieu de 4 000 $.'},
+   {id:'c4',w:3,n:'Taxes de vente : comptes de contrôle conciliés, déclarations préparées et produites pour vous',
+    say:'TPS/TVQ : on concilie, on prépare, on produit la déclaration. Tu ne cours plus après la date, et on s\'assure que tu réclames tout ce que t\'as le droit de réclamer.',
+    deep:'<b>Pour un commerce retail + gros, c\'est là que les erreurs coûtent le plus.</b> Deux directions : pénalités si en retard ou en erreur, et crédits de taxes sur intrants oubliés sur les achats de lots — de l\'argent laissé sur la table.'},
+   {id:'c5',w:3,n:'Comptes fournisseurs et paiement de factures, pris en charge pour vous',
+    say:'On paie tes fournisseurs. Toi t\'approuves, on émet. T\'as plus à te connecter à ta banque le vendredi soir pour faire des virements.',
+    deep:'<b>Objection sécurité à devancer, toujours :</b> « On n\'a pas accès à ton compte. On a une plateforme qui émet le paiement, toi tu approuves d\'un clic. Chaque paiement laisse une trace d\'auditabilité. On ne touche jamais à l\'argent. Tu veux deux approbations ? Trois ? C\'est toi qui décides. »'},
+   {id:'c6',w:3,n:'Comptabilité des stocks et du coût des produits vendus',
+    say:'Ton inventaire est dans ton bilan à la bonne valeur, et chaque mois on sait ce que les tissus vendus t\'ont vraiment coûté. Donc ta marge brute réelle — pas celle que tu penses.',
+    deep:'<b>La ligne la plus lourde pour un commerce à inventaire.</b> Deadstock acheté au rouleau, vendu au mètre, à des prix qui bougent. Sans coût des produits vendus mensuel, la marge est une impression. Et le stock qui dort depuis 2019, c\'est du cash gelé dont personne ne connaît le montant.<br><br>On comptabilise. On ne compte pas physiquement — le dire d\'avance.'},
+   {id:'c7',w:2,n:'Chaque compte de bilan important concilié',
+    say:'Chaque montant dans ton bilan a une preuve derrière. Le compte à recevoir dit 40 000 $ ? Voici les factures qui font 40 000 $.',
+    deep:'Un bilan sans preuves, c\'est un bilan qu\'un acheteur ou un prêteur ne croit pas. Ça sert aussi à trouver les vieux soldes qui traînent depuis des années et que personne n\'a nettoyés.'},
+   {id:'c8',w:2,n:'Vieillissement des comptes clients et fournisseurs, et tableaux d\'écarts d\'un mois à l\'autre',
+    say:'Qui te doit de l\'argent depuis plus de 60 jours, à qui tu dois. Et ce qui a bougé depuis le mois passé, ligne par ligne, avec le pourquoi.',
+    deep:''},
+   {id:'c9',w:3,n:'Une révision interne avant chaque livraison ; la période se verrouille dès votre approbation',
+    say:'Avant que tu reçoives quoi que ce soit, une deuxième paire d\'yeux a tout revu. Tu approuves, la période se verrouille. Plus personne ne peut revenir changer un chiffre en douce.',
+    deep:'C\'est la garantie de qualité. Quatre yeux, pas deux. Et le verrouillage, c\'est ce qui fait qu\'un historique est crédible — pour vendre, pour emprunter, pour dormir.'},
+  ],
+  contrast:{lbl:'Ancrage — dire après la dernière ligne',s:'« Si t\'engages un commis-comptable demain matin, il va faire à peu près ça. Il va te coûter le prix, ou plus. Puis il va être malade, en vacances, ou partir. Nous, on est là chaque mois. »'}},
+ {id:'cfo',name:'CFO',price:'site : à partir de 3 600 $/mois · offert à partir de 1 M$ de revenus · sous 1 M$ : séances à 500 $',
+  one:'Tout Controller, plus la fonction finance autour. Le bras droit du président.',
+  who:'L\'entrepreneur qui veut grossir, préparer une sortie, ou arrêter de piloter au feeling. Sous 1 M$, on ne vend pas le forfait : séances à la pièce. Version 90 secondes sauf s\'il a parlé croissance ou vente.',
+  items:[
+   {id:'f1',w:3,n:'Votre budget annuel, bâti avec vous — puis le réel contre le budget, avec commentaires',
+    say:'On bâtit ton budget ensemble. Puis chaque mois : prévu, réel, et pourquoi c\'est différent. Pas juste le chiffre — la raison.',
+    deep:'C\'est là qu\'on trouve où la marge fuit. Exemple qu\'Hugo donne : « T\'avais budgété ton produit à 2 $, tu l\'as vendu à 1,60 $. Ce n\'est pas que t\'as pas vendu assez — c\'est le prix. » Volume vs prix vs mix : le budget commenté sépare les trois.'},
+   {id:'f2',w:3,n:'Un rapport de gestion et un tableau de bord d\'indicateurs',
+    say:'Quatre ou cinq indicateurs qui pilotent vraiment ta business, suivis chaque mois. Pas trente. Ceux qui font bouger le résultat avant qu\'il arrive.',
+    deep:'Le module leading / lagging : « Si tu veux perdre du poids, la balance c\'est ce qui arrive à la fin. Les calories, le sommeil, l\'exercice, c\'est ce qui le prédit. On mesure ce qui prédit. »'},
+   {id:'f3',w:2,n:'Une prévision de trésorerie sur 13 semaines, actualisée chaque mois',
+    say:'Est-ce que t\'as le cash pour acheter le lot en novembre et passer janvier ? Tu le sais 13 semaines d\'avance, pas la veille.',
+    deep:'Un commerce vit une saisonnalité. Les achats de lots sont irréguliers et gros. Le 13 semaines, c\'est ce qui empêche de dire non à une opportunité par peur, ou de dire oui et manquer de payer la paie.'},
+   {id:'f4',w:1,n:'Des états consolidés pour l\'ensemble de vos entités',
+    say:'Si t\'as plus d\'une compagnie — un immeuble, une holding, une deuxième bannière — on te donne la vue d\'ensemble, pas trois bilans séparés.',
+    deep:'Poids nul si une seule entité. Passer vite. Si il mentionne une holding ou un immeuble détenu à part, ça devient un point fort.'},
+   {id:'f5',w:3,n:'Des séances de travail aux deux semaines',
+    say:'Aux deux semaines, on s\'assoit. Ce mois-ci tu devais atteindre A, B, C, D. T\'as atteint A et B. Qu\'est-ce qui a fait qu\'on n\'a pas atteint C et D ? Comment on rattrape ?',
+    deep:'C\'est de l\'imputabilité, pas du reporting. Beaucoup d\'entrepreneurs n\'ont personne à qui rendre des comptes — ça se voit dans les résultats. Le début est plus dense : onboarding lourd pour que la business soit bien settée, puis ça se stabilise.'},
+   {id:'f6',w:1,n:'Un dossier trimestriel pour votre conseil et vos investisseurs',
+    say:'Chaque trimestre, un dossier qui explique où la business est rendue, objectivement. Pour un conseil, des associés, ou un jour, un acheteur.',
+    deep:'Poids faible pour un propriétaire unique. Devient un argument si il parle de vendre : « L\'acheteur va vouloir trois ans d\'historique propre. Ça commence aujourd\'hui. »'},
+  ],
+  contrast:{lbl:'Ancrage',s:'« La structure d\'une business de 20 millions, dans une business de [X]. Pas de département finance à embaucher. Ça te donne un edge sur n\'importe qui dans ton marché. »'}},
+];
+
+
+// ---------- PROFIL / DIMENSIONS ----------
+const dims=[
+ {id:'industrie',l:'Industrie',pre:true,opts:{retail:'Commerce de détail',distribution:'Distribution / gros',terrain:'Service terrain / trades',manuf:'Manufacturier',pro:'Services professionnels',resto:'Restauration / hospitalité'}},
+ {id:'age',l:'Âge de la business',pre:true,opts:{jeune:'< 5 ans',mid:'5-20 ans',vieille:'20 ans +'}},
+ {id:'ca',l:'Revenus (ancrage + palier)',pre:true,opts:{lt1:'< 1 M$',b1:'1 – 1,5 M$',b2:'1,5 – 6 M$',b3:'6 M$ +'}},
+ {id:'livres',l:'Qui fait les livres',opts:{personne:'Personne / le proprio',commis:'Commis interne',externe:'Teneuse externe',cpa:'Le cabinet CPA fait tout',ctrl:'Contrôleur interne'}},
+ {id:'lien',l:'Lien affectif avec la commis',opts:{oui:'Oui — ne pas "remplacer"',non:'Non'}},
+ {id:'maturite',l:'Maturité finance',opts:{m0:'0 — Rien / Excel',m1:'1 — Livres tenus, pas fermés',m2:'2 — Clôture partielle, CPA impliqué',m3:'3 — Structuré, contrôleur interne'}},
+ {id:'declencheur',l:'Déclencheur (pourquoi maintenant)',opts:{commis:'Commis / teneuse qui part',cpa:'CPA retraite / hausse de prix',banque:'Banque / prêteur demande des états',achat:'Achat ou vente en vue',fiscal:'Surprise fiscale / lettre RQ',palier:'Nouveau palier (1,5M · 6M · 10 emp.)',associe:'Nouvel associé / entité',aucun:'Aucun — pipeline long'}},
+ {id:'traj',l:'Trajectoire (question 3-5 ans)',opts:{lacher:'Lâcher prise / stabiliser',croitre:'Croître',sortir:'Sortir / transférer',redresser:'Redresser'}},
+ {id:'decideur',l:'Décideur',opts:{seul:'Seul',associes:'Associés',conjoint:'Conjoint·e',commis:'Commis influente'}},
+ {id:'source',l:'Source du lead',pre:true,opts:{d2d:'D2D (Sami)',cold:'Cold call (Sabrina)',inbound:'Inbound / formulaire',ref:'Référence'}},
+];
+const flags=[['inv','Inventaire'],['paie10','Paie ≥ 10 emp.'],['tps','TPS/TVQ trim. ou mens.'],['multi','Multi-entités'],['preteur','Prêteur / investisseur'],['import','Import / devises / 90 j'],['projet','Projets / acomptes / WIP'],['saison','Saisonnalité forte']];
+const profile={};const flagOn={};
+
+// ---------- CALQUES ----------
+// hook: phrase d'intro · q: [phase, question] · w: {itemId:poids} · ex: {itemId:texte} · obj: [[il dit, je réponds]] · close: angle · inf: contenu inféré (aucun transcript)
+const overlays={
+ industrie:{
+  retail:{hook:'Un commerce de détail, c\'est trois choses qui bougent tout le temps : la caisse, l\'inventaire, les taxes. C\'est là qu\'on regarde en premier.',q:[['finance','Ton inventaire, tu sais combien ça vaut aujourd\'hui ?'],['business','Ta split retail vs gros, à peu près ?']],w:{c6:3,c4:3,b2:3},ex:{c6:'Du stock acheté en lot il y a des années, encore en rayon : du cash gelé dont personne ne connaît le montant. « Tu sais combien vaut ce qui est sur tes tablettes aujourd\'hui ? »',b2:'Caisse + Interac + dépôts groupés : c\'est là que les écarts se cachent.',b1:'Achats de marchandise, frais de boutique, livraison, frais de carte : quatre lignes séparées. Aujourd\'hui c\'est probablement tout dans « dépenses ».',b4:'« Ventes +12 %, achats de lots +40 %, marge brute en baisse de 4 points — on en parle. »',b6:'Écarts entre les dépôts et les rapports de caisse : premier endroit où on regarde.',b7:'Un lot qui passe, il faut le payer cash cette semaine. Une banque qui a déjà tes chiffres propres répond en jours.',c2:'Dépôts clients pour des commandes spéciales = revenu reporté, pas gagné tant que ce n\'est pas livré.',c4:'Achat d\'un lot à 15 000 $ : le CTI là-dessus c\'est 2 200 $. Reçu mal saisi = perdu.',c5:'Fournisseurs à l\'étranger, paiements irréguliers, gros montants : l\'approbation et la trace d\'audit, c\'est de la protection pour lui.',c8:'Le côté gros — designers, revendeurs — c\'est du crédit. Qui doit 6 000 $ depuis 90 jours, il faut le savoir en octobre.',f1:'« Ton produit budgété à 30 $, vendu à 24 $ parce que le marché a dit ça. Le volume a l\'air ok, tu as laissé 20 % sur la table. »',f2:'Marge brute par catégorie · rotation d\'inventaire · panier moyen retail vs gros · % de stock de plus de 24 mois.'},obj:[['« Mon inventaire, je le connais de tête. »','« Je te crois. Mais ta banque, ton CPA et un acheteur ne le connaissent pas. On le met dans le bilan à la bonne valeur, chaque mois. »']],close:'L\'inventaire, c\'est là que se cache ta marge.',inf:true},
+  distribution:{hook:'En distribution, ta marge se joue sur trois choses : ce que tu paies tes fournisseurs, quand, et à quel prix tu revends. On regarde les trois.',q:[['finance','Tes gros fournisseurs, tu leur dois combien en moyenne ? Payé à combien de jours ?'],['business','Ton volume a grossi — tes prix ont suivi ?']],w:{c6:3,c8:3,f3:3,c5:3},ex:{f3:'Container commandé aujourd\'hui, payé dans 60-90 jours. Sans 13 semaines, tu découvres le trou quand il est là.',f1:'Produit budgété à 2 $, vendu à 1,60 $ parce que le marché a dit ça. Ce n\'est pas le volume, c\'est le prix.',c8:'Le côté gros c\'est du crédit : qui te doit 6 000 $ depuis 90 jours, tu le sais en octobre, pas en mars.'},obj:[['« On veut y aller graduel. »','« Parfait. On part sur Controller, et on fixe une date pour réévaluer CFO — pas un mois flou, une date. »']],close:'Croissance profitable et contrôlée. Le bateau ne coule pas de partout.',inf:false},
+  terrain:{hook:'En service terrain, la finance et la main-d\'œuvre c\'est la même question : un employé sert combien de revenus, et combien de temps avant qu\'un nouveau soit rentable.',q:[['business','Un employé, il sert à peu près combien de revenus par année ?'],['finance','Tes DAS et ta CNESST, c\'est qui qui les suit ?']],w:{c3:3,f1:3,f5:3,c1:3},ex:{f1:'1 employé = 100K de revenus. Pour 1M, 10 employés. Ramp-up 2 mois, et une partie qui part. Le modèle le calcule avant que tu embauches.',c3:'Les écarts de DAS, c\'est des lettres de Revenu Québec. Le rapprochement mensuel les attrape à 200 $ au lieu de 4 000 $.'},obj:[['« Mon seul problème c\'est la main-d\'œuvre. »','« Tu refuses des contrats parce que t\'as pas les bras. C\'est un problème de chiffres : combien il t\'en faut, quand, formés en combien de temps. On le modélise. »']],close:'Travailler sur ta business, pas dans ta business.',inf:false},
+  manuf:{hook:'En fabrication, la question qu\'on pose en premier : tu connais ta marge par produit, ou juste ta marge totale ?',q:[['finance','Ton coût de revient par produit, tu l\'as ?']],w:{c6:3,f1:3,f2:3},ex:{c6:'Matières, main-d\'œuvre, frais d\'usine : si le coût de revient n\'est pas à jour, un produit rentable subventionne un produit qui perd.',f2:'Marge par ligne de produit, taux de rebut, heures machine : trois indicateurs qui pilotent une usine.'},obj:[],close:'',inf:true},
+  pro:{hook:'En services, le piège c\'est le revenu qui n\'est pas encore gagné : acomptes, projets en cours, heures non facturées.',q:[['finance','Tu factures au projet ou au temps ? Tu prends des acomptes ?']],w:{c2:3,c8:3,f2:3},ex:{c2:'Un acompte de 20 000 $ n\'est pas un revenu tant que le travail n\'est pas livré. Là, il gonfle probablement un mois au hasard.',f2:'Taux d\'utilisation, revenu par heure facturable, jours de recouvrement.'},obj:[],close:'',inf:true},
+  resto:{hook:'En restauration, la marge se perd au comptoir et dans les taxes. On regarde la caisse en premier.',q:[['finance','Tes dépôts balancent avec tes rapports de caisse ?']],w:{b2:3,c4:3,c3:3,f3:3},ex:{b2:'Écarts entre dépôts et rapports de caisse : c\'est le premier endroit où on trouve de l\'argent.',c3:'Pourboires, paie variable, DAS : le trio qui génère des pénalités.'},obj:[],close:'17,9 % des restaurateurs pensent vendre dans 12 mois. Si c\'est toi, l\'historique propre commence aujourd\'hui.',inf:true},
+ },
+ age:{
+  jeune:{hook:'À moins de 5 ans, l\'avantage c\'est que rien n\'est figé. On installe les bonnes bases maintenant, avant que ça coûte cher à défaire.',q:[],w:{},ex:{},obj:[['« On est trop jeunes pour ça. »','« C\'est le contraire. À 3 ans, tout ce qu\'on met en place te suit. À 20 ans, on doit défaire avant de faire. »']],close:'Installer les bases avant que ça fige.',inf:false},
+  mid:{hook:'',q:[],w:{},ex:{},obj:[],close:'',inf:false},
+  vieille:{hook:'Vingt ans, ça veut dire que ce qui marche, marche. On ne casse rien. On documente, et on remplace ce qui coûte.',q:[['business','À ce stade-là, tu penses à la relève ? Vendre, transmettre, garder ?']],w:{c9:3,f6:2,c7:3},ex:{c9:'Un acheteur veut trois ans d\'historique fermé et verrouillé. Ça commence aujourd\'hui, pas le jour où tu mets l\'annonce.',f6:'13 % des entreprises de 20 ans et plus pensent transférer dans les 12 mois. Un dossier trimestriel, c\'est le début de la valorisation.'},obj:[['« Ma commis est là depuis 15 ans. »','« Je ne veux pas la remplacer. Je veux lui enlever ce qui ne devrait pas être sur son bureau. »']],close:'Ce que tu as bâti en 20 ans, on le rend vendable, ou transmissible, ou juste tranquille.',inf:false},
+ },
+ ca:{
+  lt1:{hook:'',q:[],w:{},ex:{},obj:[['« C\'est combien ? »','« Ça se compare à ce que te coûte ta commis. Je t\'arrive avec le chiffre exact à la Proposition. »']],close:'',inf:false,pal:'TPS/TVQ annuelle · CFO non offert (séances à 500 $) · ancrage : ta commis'},
+  b1:{hook:'',q:[],w:{},ex:{},obj:[],close:'',inf:false,pal:'TPS/TVQ annuelle (jusqu\'à 1,5M) · CFO éligible · ancrage : ta commis'},
+  b2:{hook:'À ta taille, tes taxes sont trimestrielles — quatre déclarations, quatre dates. Ce n\'est plus une affaire de fin d\'année.',q:[['finance','Tes déclarations trimestrielles, c\'est qui qui les produit ?']],w:{c4:3},ex:{c4:'Trimestrielle obligatoire au-dessus de 1,5M. Quatre dates par année, et les CTI oubliés sur les gros achats, c\'est de l\'argent laissé là.'},obj:[],close:'',inf:false,pal:'TPS/TVQ trimestrielle · CFO éligible · ancrage : un contrôleur (80-90K)'},
+  b3:{hook:'À plus de 6M, tes taxes sont mensuelles. Douze déclarations. Un commis à temps partiel ne suit pas ça.',q:[['finance','Douze déclarations par année — qui les fait, et combien de fois vous avez été en retard ?']],w:{c4:3,c3:3,c1:3},ex:{c4:'Mensuelle obligatoire au-dessus de 6M. Douze dates. Une pénalité par retard.',c3:'Masse salariale au-dessus de 1M : le FSS n\'est plus fixe à 1,65 %, il grimpe. Chaque embauche coûte plus que le salaire.'},obj:[],close:'',inf:true,pal:'TPS/TVQ mensuelle · FSS progressif si paie > 1M · ancrage : une équipe finance (contrôleur + commis)'},
+ },
+ livres:{
+  personne:{hook:'',q:[['finance','Combien d\'heures par semaine tu passes là-dessus, toi ?']],w:{b1:3,b2:3,b3:3},ex:{b3:'Dix minutes par semaine pour répondre à nos questions. Le reste, tu ne le fais plus.'},obj:[['« Je le fais moi-même, ça me coûte rien. »','« Ça te coûte tes soirées. Et ça coûte à ta business le président qui n\'est pas sur la business. »']],close:'',inf:true},
+  commis:{hook:'',q:[['finance','Elle fait quoi exactement ? Et quoi d\'autre que la compta ?']],w:{c1:3,c9:3},ex:{c9:'Ta commis tient les livres. Personne ne les ferme ni ne les verrouille. C\'est ce qui manque.'},obj:[['« Ma commis fait ça depuis des années. »','« Je ne doute pas. La question c\'est pas si ça marche, c\'est ce que tu fais avec. Tes chiffres du mois, tu les as quand ? »']],close:'Ancrage : pour ce que te coûte ta commis, tu as la fonction finance au complet.',inf:false},
+  externe:{hook:'',q:[['finance','Elle te coûte combien par année ? Et elle produit quoi, à quelle fréquence ?']],w:{c1:3,b8:2},ex:{c1:'Teneuse externe à 2 400 $/an = des livres, pas une comptabilité. Le mois n\'est jamais fermé.'},obj:[['« J\'ai déjà quelqu\'un. »','« Il ne faut pas payer en double. On regarde ce qu\'elle fait, on prend ce qui est à nous, elle garde le reste ou tu la libères. »']],close:'',inf:false},
+  cpa:{hook:'',q:[['finance','Ton cabinet, il fait la tenue de livres aussi, ou juste la fin d\'année ? Tu paies combien au total ?']],w:{b8:3,c1:3},ex:{b8:'On ne remplace pas ton CPA. On lui envoie un dossier fermé — sa facture baisse, la tienne se compense.'},obj:[['« Mon CPA s\'occupe de tout. »','« Une fois par année. Entre les deux, tu pilotes à l\'aveugle. On te donne le mensuel, lui garde l\'annuel. »']],close:'',inf:true},
+  ctrl:{hook:'Vous avez déjà un contrôleur. Donc on ne parle pas de structure, on parle de vitesse et de coût sur la première ligne.',q:[['finance','Ta première ligne — catégorisation, conciliation — ça prend combien d\'heures de qui ?']],w:{b1:3,b2:3,b3:3},ex:{b1:'Ton contrôleur passe ses journées à faire de la saisie au lieu de fermer et d\'analyser. On prend la saisie.'},obj:[['« On a déjà tout ça. »','« Vous avez le haut. C\'est le bas qui vous coûte cher en heures de contrôleur. »']],close:'Books seul : on libère ton contrôleur de la première ligne.',inf:true},
+ },
+ lien:{oui:{hook:'',q:[],w:{},ex:{},obj:[['— règle —','Jamais « remplacer ». Toujours « libérer », « lui enlever des tâches », « la mettre sur autre chose ». Elle valide la décision — vendre à elle aussi, indirectement.']],close:'',inf:false},non:{hook:'',q:[],w:{},ex:{},obj:[],close:'',inf:false}},
+ maturite:{
+  m0:{hook:'',q:[],w:{b1:3,b2:3},ex:{},obj:[],close:'Onboarding : on repart propre.',inf:true},
+  m1:{hook:'',q:[],w:{c1:3,c9:3},ex:{c1:'Tes livres sont tenus. Ils ne sont pas fermés. C\'est exactement la ligne entre Books et Controller.'},obj:[],close:'Onboarding : tes livres sont tenus, pas fermés.',inf:false},
+  m2:{hook:'',q:[],w:{c1:3,f1:2},ex:{},obj:[],close:'Onboarding : on garde ton CPA et ton système, on ajoute la couche mensuelle.',inf:true},
+  m3:{hook:'',q:[],w:{b1:3,b3:3},ex:{},obj:[],close:'Books seulement. Ne pas vendre Controller à quelqu\'un qui en a un.',inf:true},
+ },
+ declencheur:{
+  commis:{hook:'Ta commis qui part, c\'est le pire moment et le meilleur moment. Le pire parce que tout est dans sa tête. Le meilleur parce que tu ne remplaces pas une personne, tu remplaces une fonction.',q:[['finance','Elle part quand ? Qu\'est-ce qui est documenté ?']],w:{},ex:{},obj:[],close:'Urgence réelle. Proposer un démarrage avant son départ.',inf:true},
+  cpa:{hook:'',q:[['finance','Il prend sa retraite quand ? Il t\'a référé quelqu\'un ?']],w:{b8:3},ex:{},obj:[],close:'On travaille avec n\'importe quel CPA. On lui envoie un dossier fermé.',inf:true},
+  banque:{hook:'Quand la banque demande des états mensuels, c\'est qu\'elle veut te prêter — ou qu\'elle s\'inquiète. Dans les deux cas, il faut des chiffres fermés, vite.',q:[['finance','Elle demande quoi exactement, et pour quand ?']],w:{b7:3,c1:3,f3:3},ex:{b7:'La trousse prêteur est prête. Une banque qui a des chiffres propres répond en jours.'},obj:[],close:'Urgence réelle. La trousse prêteur est le premier livrable.',inf:true},
+  achat:{hook:'Acheter ou vendre, c\'est le moment où les chiffres deviennent de l\'argent. Chaque dollar de profit mal comptabilisé, c\'est 3 à 5 $ de prix.',q:[['business','C\'est pour quand ? Tu as déjà un chiffre en tête ?']],w:{c7:3,c9:3,f6:3},ex:{c9:'L\'acheteur va vouloir trois ans d\'historique verrouillé. Chaque mois qui passe non fermé est un mois qu\'il va contester.'},obj:[],close:'Module salaire du président + valorisation. Sortir avec le RDV2 vite.',inf:true},
+  fiscal:{hook:'Une lettre de Revenu Québec, c\'est rarement une surprise pour les chiffres. C\'est une surprise pour toi. La différence, c\'est le rapprochement mensuel.',q:[['finance','C\'était quoi ? Combien ? C\'est réglé ?']],w:{c3:3,c4:3},ex:{},obj:[],close:'',inf:true},
+  palier:{hook:'',q:[],w:{c4:3},ex:{},obj:[],close:'Nommer le palier franchi. Crédibilité gratuite.',inf:true},
+  associe:{hook:'Un nouvel associé, ça veut dire des chiffres que deux personnes doivent croire. Pas juste toi.',q:[['business','Il a accès aux chiffres aujourd\'hui ? Vous les regardez ensemble ?']],w:{c7:3,f6:3,f4:2},ex:{},obj:[],close:'',inf:true},
+  aucun:{hook:'',q:[],w:{},ex:{},obj:[['— règle —','Pas de déclencheur = pipeline long. Ne pas forcer le close. Sortir avec une date de suivi et une raison de rappeler (palier, fin d\'année, budget).']],close:'',inf:false},
+ },
+ traj:{
+  lacher:{hook:'',q:[],w:{c1:3,c5:3,c9:3},ex:{},obj:[],close:'« Un mois de vacances sans téléphone. » Module autobus / SOP. Controller.',inf:false},
+  croitre:{hook:'',q:[],w:{f1:3,f2:3,f3:3,f5:3},ex:{},obj:[],close:'« Croissance profitable et contrôlée. » Modèle de capacité, funnel, leading/lagging. CFO si ≥ 1M.',inf:false},
+  sortir:{hook:'',q:[['business','Tu as une idée du prix que tu voudrais ? Quelqu\'un t\'a déjà dit ce que ça vaut ?']],w:{c7:3,c9:3,f6:3,f1:2},ex:{f6:'Un acheteur paie un multiple du profit réel — après le salaire d\'un président de remplacement. On le calcule ensemble.'},obj:[],close:'« L\'acheteur va regarder ça. » Module salaire du président + SOP + 3 ans d\'historique.',inf:true},
+  redresser:{hook:'',q:[['finance','Ta trésorerie, tu la vois à combien de semaines aujourd\'hui ?']],w:{f3:3,c8:3,c5:3},ex:{f3:'Savoir 13 semaines d\'avance, pas la veille de la paie.'},obj:[],close:'« Savoir 13 semaines d\'avance. » Controller + prévision de trésorerie.',inf:true},
+ },
+ decideur:{seul:{hook:'',q:[],w:{},ex:{},obj:[],close:'Proposition : lui seul, en personne, signature sur place.',inf:false},associes:{hook:'',q:[],w:{f6:2},ex:{},obj:[],close:'Proposition : tous les associés présents, sinon pas de Proposition.',inf:true},conjoint:{hook:'',q:[],w:{},ex:{},obj:[],close:'Proposition : demander que le/la conjoint·e soit là.',inf:true},commis:{hook:'',q:[],w:{},ex:{},obj:[['— règle —','La commis valide. Elle ne doit pas être à la Proposition (conflit d\'intérêt), mais le client doit lui avoir parlé avant. Angle : on la libère.']],close:'',inf:false}},
+ source:{
+  d2d:{hook:'Sami t\'a rencontré chez vous. Moi je viens pour comprendre ta business et te dire honnêtement ce qui ferait du sens.',q:[],w:{},ex:{},obj:[],close:'',inf:false},
+  cold:{hook:'Sabrina t\'a parlé au téléphone. Je vais partir de ce que tu lui as dit, pas te faire tout répéter.',q:[],w:{},ex:{},obj:[['« C\'est combien ? » (tôt)','« Bonne question, je vais y répondre. Avant, laisse-moi comprendre ce que tu as aujourd\'hui, sinon je te donne un prix à moitié bon. Ordre de grandeur : ce que te coûte ta commis. »']],close:'Lead froid : crédibilité (C\'est qui Cruisr) avant les questions business. Prévoir le prix en phase 2.',inf:true},
+  inbound:{hook:'Tu nous as trouvés toi-même. Dis-moi ce qui t\'a fait cliquer.',q:[['business','Qu\'est-ce qui t\'a fait nous écrire ?']],w:{},ex:{},obj:[],close:'',inf:true},
+  ref:{hook:'[Nom] nous a référés. Je commence par te demander ce qu\'il t\'a dit de nous.',q:[['business','Il t\'a dit quoi, exactement ?']],w:{},ex:{},obj:[],close:'Référence : une mensualité au référent par client signé — le dire au client.',inf:false},
+ },
+};
+const flagOverlays={
+ inv:{w:{c6:3},ex:{c6:'Drapeau inventaire coché : sans coût des produits vendus mensuel, la marge est une impression.'}},
+ paie10:{w:{c3:3},ex:{c3:'10 employés et plus : équité salariale obligatoire (exercice dans 4 ans, déclaration annuelle). Le dire = crédibilité. À 25 : francisation.'}},
+ tps:{w:{c4:3},ex:{}},
+ multi:{w:{f4:3,c7:3},ex:{f4:'Plus d\'une entité : les états consolidés passent de poids 1 à poids 3.'}},
+ preteur:{w:{b7:3,f6:3,c1:3},ex:{b7:'Prêteur ou investisseur : la trousse et le dossier trimestriel deviennent des livrables attendus, pas des bonus.'}},
+ import:{w:{f3:3,c5:3},ex:{f3:'Fournisseurs à 60-90 jours, devises : le 13 semaines est vital.'}},
+ projet:{w:{c2:3,c8:3},ex:{c2:'Acomptes et travaux en cours : revenus reportés obligatoires, sinon les mois ne se comparent pas.'}},
+ saison:{w:{f3:3,f1:2},ex:{f3:'Saisonnalité : la prévision doit couvrir le creux, pas la moyenne.'}},
+};
+
+// ---------- RECOMMANDATION ----------
+// Règle (une ligne à ajuster avec Hugo) :
+function recommend(){
+ const nf=Object.values(flagOn).filter(Boolean).length;
+ const p=profile;const why=[];
+ if(p.maturite==='m3'){why.push('<b>Maturité 3</b> — contrôleur interne. On vend l\'optimisation de la première ligne, pas la structure.');return {plan:'Books',why,nf};}
+ const cfoOK=p.ca&&p.ca!=='lt1';
+ const grow=p.traj==='croitre'||p.traj==='sortir';
+ if(nf>=3&&grow&&cfoOK){why.push(`<b>${nf} drapeaux</b> + trajectoire <b>${dims.find(d=>d.id==='traj').opts[p.traj]}</b> + revenus ≥ 1M.`);return {plan:'CFO',why,nf};}
+ if(nf>=3&&grow&&!cfoOK){why.push(`<b>${nf} drapeaux</b> + croissance/sortie, mais revenus < 1M : Controller + séances CFO à 500 $.`);return {plan:'Controller + séances CFO',why,nf};}
+ why.push(nf?`<b>${nf} drapeau${nf>1?'x':''}</b> coché${nf>1?'s':''}.`:'Aucun drapeau coché encore.');
+ if(p.traj)why.push(`Trajectoire : ${dims.find(d=>d.id==='traj').opts[p.traj]}.`);
+ if(!p.ca)why.push('Revenus non renseignés — éligibilité CFO inconnue.');
+ return {plan:'Controller',why,nf};
+}
+function anchor(){const a={lt1:'ta commis',b1:'ta commis',b2:'un contrôleur (80-90K)',b3:'une équipe finance'}[profile.ca];return a?`Ancrage prix : <b>${a}</b>`:'';}
+function palier(){const o=overlays.ca[profile.ca];return o&&o.pal?o.pal:'';}
+
+// ---------- CALQUES ACTIFS ----------
+function activeOverlays(){const out=[];for(const d of dims){const v=profile[d.id];if(v&&overlays[d.id]&&overlays[d.id][v])out.push({dim:d.l,key:d.id,val:d.opts[v],o:overlays[d.id][v]});}return out;}
+function itemWeight(id,base){let w=base;for(const a of activeOverlays()){if(a.o.w&&a.o.w[id])w=Math.max(w,a.o.w[id]);}for(const f of flags){if(flagOn[f[0]]&&flagOverlays[f[0]].w[id])w=Math.max(w,flagOverlays[f[0]].w[id]);}return w;}
+function itemExtras(id){let h='';for(const a of activeOverlays()){if(a.o.ex&&a.o.ex[id])h+=`<span class="gt ov ${a.o.inf?'inf':''}" data-l="${a.val}${a.o.inf?' · inféré':''}">${a.o.ex[id]}</span>`;}for(const f of flags){if(flagOn[f[0]]&&flagOverlays[f[0]].ex[id])h+=`<span class="gt ov" data-l="${f[1]}">${flagOverlays[f[0]].ex[id]}</span>`;}return h;}
+function calqueBlocks(phaseId){
+ let h='';const acts=activeOverlays();
+ const map={ouverture:'hook',business:'q',finance:'q',positionner:'close',close:'close'};
+ const kind=map[phaseId];if(!kind)return '';
+ for(const a of acts){
+  const o=a.o;const inf=o.inf?'<span class="inf">inféré</span>':'';
+  if(kind==='hook'&&o.hook)h+=`<div class="calque"><span class="lbl">${a.dim} · ${a.val}${inf}</span><div class="s">${o.hook}</div></div>`;
+  if(kind==='q'){const qs=(o.q||[]).filter(x=>x[0]===phaseId);if(qs.length)h+=`<div class="calque"><span class="lbl">${a.dim} · ${a.val}${inf}</span>${qs.map(x=>`<div class="q">${x[1]}</div>`).join('')}</div>`;}
+  if(kind==='close'&&o.close)h+=`<div class="calque"><span class="lbl">${a.dim} · ${a.val}${inf}</span><div class="s">${o.close}</div></div>`;
+ }
+ if(phaseId==='ouverture'&&palier())h+=`<div class="calque"><span class="lbl">Revenus · palier</span><div class="s" style="font-family:var(--mono);font-size:13px">${palier()}</div></div>`;
+ return h?`<div class="calques-h">Calques actifs</div>${h}`:'';
+}
+function objectionRows(){let h='';for(const a of activeOverlays()){for(const ob of (a.o.obj||[]))h+=`<tr><td>${ob[0]}<br><span style="font-family:var(--mono);font-size:10.5px;color:var(--green)">${a.val}${a.o.inf?' · inféré':''}</span></td><td>${ob[1]}</td></tr>`;}return h;}
+function recBox(){const r=recommend();return `<div class="rec"><div class="badge">${r.plan}</div><div class="why">${r.why.join(' ')} ${anchor()}${palier()?`<div class="pal">${palier()}</div>`:''}</div></div>`;}
+
+// ---------- RENDER ----------
+
+const nav=document.getElementById('nav'),main=document.getElementById('main'),fEl=document.getElementById('fields');
+let cur=0, currentPin=null; const done=new Set(); const ticks={};
+const curPhases=()=>phases;
+function renderNav(){
+ const ph=curPhases();
+ let h=`<div class="nav-title">${L('Déroulé · 45 min')}</div>`;
+ ph.forEach((p,i)=>{h+=`<button class="phase ${i===cur&&!currentPin?'active':''} ${done.has(p.id)?'done':''} ${i===ph.length-1?'last':''}" data-i="${i}"><span class="dot"></span><span class="name">${L(p.name)}</span><span class="t">${L(p.t)}</span></button>`});
+ h+=`<div class="pins"><div class="nav-title">${L('Toujours à portée')}</div>`;
+ for(const k in pins){h+=`<button class="pin ${currentPin===k?'active':''}" data-pin="${k}">${L(pins[k].title)}</button>`}
+ h+=`</div><div class="warn">${L('<b>Ne pas</b> dire « les petites » · présenter les prix du site comme finaux · parler du site web · monologuer 2 min sans check-in.')}</div>`;
+ h+=`<div class="warnbar">${Object.keys(profile).filter(k=>profile[k]).length} dimensions · ${Object.values(flagOn).filter(Boolean).length} drapeaux</div>`;
+ nav.innerHTML=h;
+ nav.querySelectorAll('.phase').forEach(b=>b.onclick=()=>go(+b.dataset.i));
+ nav.querySelectorAll('.pin').forEach(b=>b.onclick=()=>showPin(b.dataset.pin));
+}
+function block(b,ctx){
+ switch(b.type){
+  case 'say':return `<div class="say"><span class="lbl">${L(b.l)}</span>${L(b.t)}</div>`;
+  case 'note':return `<p class="note">${L(b.t)}</p>`;
+  case 'h3':return `<h3>${L(b.t)}</h3>`;
+  case 'check':return `<div class="check"><span class="lbl">Check-in</span><p>${L('« '+b.t+' »')}</p></div>`;
+  case 'html':return b.t;
+  case 'tpl':{const tx=fill(b.t);return `<div class="tpl"><span class="lbl">${b.l}</span><button class="cp" data-t="${encodeURIComponent(tx)}">copier</button><pre>${tx}</pre></div>`;}
+  case 'cap':return `<div class="cap">${b.t}</div>`;
+  case 'plans':return renderPlans();
+  case 'qs':return `<ul class="qs">${b.items.map((it,j)=>{const k=ctx+'-'+j;return `<li class="${ticks[k]?'on':''}" data-k="${k}"><span class="box"></span><span class="q">${it.key?`<span class="key">${L(it.key)}</span>`:''}${L(it.q)}${it.why?`<span class="why">${L(it.why)}</span>`:''}</span></li>`}).join('')}</ul>`;
+ }
+}
+function renderMain(p,ctx,eyebrow,phaseId){
+ let h=`<div class="eyebrow">${eyebrow}</div><h2>${L(p.title)}</h2><p class="goal">${L(p.goal)}</p>`;
+ if(phaseId==='positionner'||phaseId==='forfaits')h+=recBox();
+ h+=p.blocks.map((b,i)=>block(b,ctx+i)).join('');
+ if(phaseId)h+=calqueBlocks(phaseId);
+ if(ctx==='pin-objections'){const rows=objectionRows();if(rows)h+=`<div class="calques-h">Objections des calques actifs</div><table><tr><th>Il dit</th><th>Je réponds</th></tr>${rows}</table>`;}
+ main.innerHTML=h;main.scrollTop=0;
+ main.querySelectorAll('.qs li').forEach(li=>li.onclick=()=>{ticks[li.dataset.k]=!ticks[li.dataset.k];li.classList.toggle('on')});
+ main.querySelectorAll('.tpl .cp').forEach(b=>b.onclick=()=>{navigator.clipboard.writeText(decodeURIComponent(b.dataset.t)).then(()=>toastMsg('Copié'))});
+ bindPlans();
+}
+function go(i){currentPin=null;const ph=curPhases();cur=Math.max(0,Math.min(ph.length-1,i));if(cur>0)done.add(ph[cur-1].id);renderNav();const p=ph[cur];renderMain(p,p.id,`${cur} / ${ph.length-1} · ${L(p.t)}`,p.id);}
+function showPin(k){currentPin=k;renderNav();renderMain(pins[k],'pin-'+k,L('Épinglé'));}
+
+let curPlan=1; const openItems={};
+function renderPlans(){
+ const P=plans[curPlan];const r=recommend();
+ return `<div class="ptabs">${plans.map((p,i)=>`<button class="ptab ${i===curPlan?'active':''}" data-p="${i}"><span class="n">${p.name}${r.plan.startsWith(p.name)?' ✓':''}</span><span class="p">${L(p.price)}</span></button>`).join('')}</div>
+ <div class="pintro"><div><span class="lbl">${L('En une phrase')}</span><div class="s">${L(P.one)}</div></div><div><span class="lbl">${L('Pour qui')}</span>${L(P.who)}</div></div>
+ <div class="legend">● ● ● poids — base + calques actifs · clic sur une ligne = quoi dire + profondeur</div>
+ <div class="items">${P.items.map((it,j)=>{const k=P.id+j;const w=itemWeight(it.id,it.w);return `<div class="item ${openItems[k]?'open':''}" data-k="${k}"><button class="head"><span class="w w${w}">${[1,2,3].map(x=>`<i class="${x<=w?'on':''}"></i>`).join('')}</span><span class="name">${L(it.n)}${w>it.w?' <span style="color:var(--green);font-family:var(--mono);font-size:10px">↑ calque</span>':''}</span><span class="arrow">${openItems[k]?L('fermer'):L('ouvrir')}</span></button><div class="body"><span></span><div><div class="say"><span class="lbl">${L('Dire')}</span>${L(it.say)}</div><div class="deep">${L(it.deep)}${itemExtras(it.id)}</div></div></div></div>`}).join('')}</div>
+ <div class="contrastbox"><span class="lbl">${L(P.contrast.lbl)}</span><div class="s">${L(P.contrast.s)}</div></div>`;
+}
+function bindPlans(){
+ main.querySelectorAll('.ptab').forEach(b=>b.onclick=()=>{curPlan=+b.dataset.p;refresh()});
+ main.querySelectorAll('.item .head').forEach(b=>b.onclick=()=>{const it=b.parentElement;openItems[it.dataset.k]=!openItems[it.dataset.k];it.classList.toggle('open');b.querySelector('.arrow').textContent=it.classList.contains('open')?L('fermer'):L('ouvrir')});
+}
+function refresh(){if(typeof persist==='function')persist();if(currentPin)showPin(currentPin);else go(cur);renderRecMini();}
+
+// ---------- PROFIL (aside) ----------
+const fields=[
+ ['sep','Business'],['entreprise','Entreprise'],['contact','Prénom nom · rôle'],['ca_exact','Revenus (chiffre)'],['emp','Nb employés'],['profit','Profit annuel'],['salaire','Salaire du proprio'],['pain','Pain — ses mots','ta'],['vision','Vision 3-5 ans','ta'],
+ ['sep','Finance actuelle'],['livres_d','Livres : qui · depuis · coût'],['delai_v','Chiffres reçus quand — ses mots'],['externe','Comptable externe'],['systeme','Système comptable'],['delai','Chiffres reçus quand'],['fin','Fin d\'année'],['comptes','Comptes banque / cartes'],
+ ['sep','Sortie'],['rdv','Proposition bookée — date / heure / lieu'],['devoir','Devoir donné'],['obj','Objection entendue'],['notes','Notes','ta'],
+];
+function renderFields(){
+ let h='<div class="sep">Dimensions</div>';
+ for(const d of dims){h+=`<div class="sel"><label for="d-${d.id}">${d.l}${d.pre?' <span style="color:var(--dim)">· avant</span>':''}</label><select id="d-${d.id}" class="${profile[d.id]?'set':''}"><option value="">—</option>${Object.entries(d.opts).map(([k,v])=>`<option value="${k}" ${profile[d.id]===k?'selected':''}>${v}</option>`).join('')}</select></div>`;}
+ h+='<div class="sep">Drapeaux de complexité</div><div class="flags">'+flags.map(f=>`<div class="flag ${flagOn[f[0]]?'on':''}" data-f="${f[0]}"><i></i>${f[1]}</div>`).join('')+'</div>';
+ h+=fields.map(f=>f[0]==='sep'?`<div class="sep">${f[1]}</div>`:`<div class="field" id="f-${f[0]}"><label for="${f[0]}">${f[1]}</label>${f[2]==='ta'?`<textarea id="${f[0]}" rows="2"></textarea>`:`<input id="${f[0]}" type="text">`}</div>`).join('');
+ fEl.innerHTML=h;
+ fEl.querySelectorAll('select').forEach(s=>s.onchange=()=>{const id=s.id.slice(2);profile[id]=s.value||undefined;s.classList.toggle('set',!!s.value);
+  if(id==='ca'){flagOn.tps=(s.value==='b2'||s.value==='b3')||flagOn.tps;} refresh();renderFields();});
+ fEl.querySelectorAll('.flag').forEach(el=>el.onclick=()=>{flagOn[el.dataset.f]=!flagOn[el.dataset.f];el.classList.toggle('on');refresh();});
+ fEl.querySelectorAll('input,textarea').forEach(el=>el.oninput=()=>el.parentElement.classList.toggle('filled',!!el.value.trim()));
+}
+function renderRecMini(){const r=recommend();document.getElementById('recmini').innerHTML=`<div class="recmini"><b>${r.plan}</b>${r.why.join(' ')}${anchor()?'<br>'+anchor():''}${palier()?`<div class="pal">${palier()}</div>`:''}</div>`;}
+const vals={};
+function saveVals(){fields.forEach(f=>{if(f[0]!=='sep'){const el=document.getElementById(f[0]);if(el)vals[f[0]]=el.value}});}
+function restoreVals(){fields.forEach(f=>{if(f[0]!=='sep'&&vals[f[0]]){const el=document.getElementById(f[0]);if(el){el.value=vals[f[0]];el.parentElement.classList.add('filled')}}});}
+const _renderFields=renderFields;renderFields=function(){saveVals();_renderFields();restoreVals();};
+
+document.getElementById('copyBtn').onclick=()=>{
+ saveVals();const r=recommend();const g=id=>(vals[id]||'').trim()||'—';
+ const dv=id=>{const d=dims.find(x=>x.id===id);return profile[id]?d.opts[profile[id]]:'—'};
+ const lines=[`Debrief Diagnostic — ${g('entreprise')} — ${new Date().toLocaleDateString('fr-CA')}`,
+  `Contact : ${g('contact')}`,
+  `Industrie · âge · revenus : ${dv('industrie')} · ${dv('age')} · ${dv('ca')} (${g('ca_exact')})`,
+  `Déclencheur : ${dv('declencheur')}`,
+  `Pain (ses mots) : ${g('pain')}`,
+  `Livres : ${dv('livres')} · lien affectif : ${dv('lien')} · ${g('livres_d')}`,
+  `Maturité finance : ${dv('maturite')} · chiffres reçus : ${g('delai')}`,
+  `Drapeaux : ${flags.filter(f=>flagOn[f[0]]).map(f=>f[1]).join(', ')||'aucun'}`,
+  `Décideur : ${dv('decideur')} · source : ${dv('source')}`,
+  `Trajectoire : ${dv('traj')} · vision : ${g('vision')}`,
+  `Forfait pressenti : ${r.plan}`,
+  `Objection entendue : ${g('obj')}`,
+  `Proposition : ${g('rdv')} · devoir : ${g('devoir')}`,
+  `Employés ${g('emp')} · profit ${g('profit')} · salaire ${g('salaire')} · externe ${g('externe')} · système ${g('systeme')} · fin d'année ${g('fin')} · comptes ${g('comptes')}`,
+  `Notes : ${g('notes')}`,`Durée : ${document.getElementById('clock').textContent}`];
+ navigator.clipboard.writeText(lines.join('\n')).then(()=>{const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1400)});
+};
+// mode
+function setMode(){go(0);renderRecMini();}
+// clock
+let start=null,tick=null;const clk=document.getElementById('clock'),cb=document.getElementById('clockBtn');
+cb.onclick=()=>{if(tick){clearInterval(tick);tick=null;cb.dataset.s='reprendre';cb.textContent=L('reprendre');return}start=start??Date.now();const base=start;const limit=45;tick=setInterval(()=>{const s=Math.floor((Date.now()-base)/1000);clk.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');clk.classList.toggle('over',s>limit*60)},500);cb.dataset.s='pause';cb.textContent=L('pause')};
+// keys
+document.addEventListener('keydown',e=>{const tag=e.target.tagName;if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT')return;if(e.key==='ArrowRight')go(cur+1);if(e.key==='ArrowLeft')go(cur-1);if(e.key==='c'||e.key==='C')go(5);if(e.key==='f'||e.key==='F')go(6);if(e.key==='p'||e.key==='P')go(phases.length-1);if(e.key==='o'||e.key==='O')showPin('objections');});
+
+// ---------- PERSISTANCE · BRIEF · NOTES (partagé) ----------
+const STORE_KEY=(typeof TOOL!=='undefined'?TOOL:'cruisr')+'_state_v1';
+const NOTES_KEY=(typeof TOOL!=='undefined'?TOOL:'cruisr')+'_notes_v1';
+function collectState(){saveVals();return {profile,flagOn,seqv:(typeof seqv!=='undefined'?seqv:{}),vals,ts:Date.now()};}
+function persist(){try{localStorage.setItem(STORE_KEY,JSON.stringify(collectState()))}catch(e){}}
+function restore(){try{const s=JSON.parse(localStorage.getItem(STORE_KEY)||'null');if(!s)return false;Object.assign(profile,s.profile||{});Object.assign(flagOn,s.flagOn||{});if(typeof seqv!=='undefined')Object.assign(seqv,s.seqv||{});Object.assign(vals,s.vals||{});return true}catch(e){return false}}
+function resetAll(){if(!confirm('Vider le prospect ? (les notes de modif restent)'))return;for(const k in profile)delete profile[k];for(const k in flagOn)delete flagOn[k];if(typeof seqv!=='undefined')for(const k in seqv)delete seqv[k];for(const k in vals)delete vals[k];fEl.querySelectorAll('input,textarea').forEach(e=>e.value='');persist();renderFields();if(typeof renderRec==='function')renderRec();if(typeof renderRecMini==='function')renderRecMini();if(typeof refresh==='function')refresh();else render();}
+setInterval(persist,3000);window.addEventListener('beforeunload',persist);
+
+// Coller le brief → profil
+function norm(x){return (x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
+function parseBrief(txt){
+ const n=norm(txt);let hits=0;
+ for(const d of dims){for(const [k,v] of Object.entries(d.opts)){const nv=norm(v.split(' — ')[0].split(' (')[0]);if(nv.length>3&&n.includes(nv)){profile[d.id]=k;hits++;break;}}}
+ for(const f of flags){if(n.includes(norm(f[1])))flagOn[f[0]]=true;}
+ if(/lien affectif\s*:\s*oui/i.test(txt))flagOn.lien=true;
+ const line=(label)=>{const m=txt.match(new RegExp('^'+label+'\\s*:\\s*(.+)$','im'));return m?m[1].trim():null;};
+ const first=txt.split('\n')[0]||'';const mm=first.match(/—\s*(.+?)\s*—/);if(mm)vals.entreprise=mm[1].trim();
+ const map={'Pain \\(ses mots\\)':'pain','Contact':'contact','Chiffres re[cç]us quand':'delai','Objection entendue':'obj','Notes':'notes','Prochaine action':'prochaine','R[ée]ception':'recep','Vision':'vision'};
+ const dg=line('Diagnostic');if(dg&&dg!=='—'&&fields.some(f=>f[0]==='notes'))vals.notes=((vals.notes||'')+' Diagnostic (Fit Call) : '+dg).trim();
+ for(const [lab,id] of Object.entries(map)){const v=line(lab);if(v&&v!=='—'&&fields.some(f=>f[0]===id))vals[id]=v;}
+ const liv=line('Livres');if(liv){const parts=liv.split('·');if(parts.length>2&&fields.some(f=>f[0]==='livres_d'))vals.livres_d=parts.slice(2).join('·').trim();}
+ const emp=txt.match(/Employ[ée]s\s+([^·\n]+)/i);if(emp&&fields.some(f=>f[0]==='emp'))vals.emp=emp[1].trim();
+ return hits;
+}
+function modal(title,placeholder,onok,okLabel){
+ const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="mbox"><div class="mt">${title}</div><textarea placeholder="${placeholder}"></textarea><div class="mb"><button class="mcancel">annuler</button><button class="mok">${okLabel||'appliquer'}</button></div></div>`;
+ document.body.appendChild(m);const ta=m.querySelector('textarea');ta.focus();
+ m.querySelector('.mcancel').onclick=()=>m.remove();m.querySelector('.mok').onclick=()=>{onok(ta.value);m.remove();};
+ m.onclick=e=>{if(e.target===m)m.remove()};
+}
+function pasteBrief(){modal('Coller le brief (ClickUp)','Coller ici le brief SDR ou le debrief Diagnostic…',txt=>{const h=parseBrief(txt);persist();renderFields();if(typeof renderRec==='function')renderRec();if(typeof renderRecMini==='function')renderRecMini();if(typeof refresh==='function')refresh();else render();toastMsg(h+' dimensions réglées');});}
+function loadNotes(){try{return JSON.parse(localStorage.getItem(NOTES_KEY)||'[]')}catch(e){return []}}
+function addNote(){modal('Note de modif — ce qui ne marche pas, ce qui manque','Ex. : Hook 1,5-6M — trop long, les gens coupent après « trimestriel ». Situation : Boîte vocale.',txt=>{if(!txt.trim())return;const nts=loadNotes();nts.push({t:txt.trim(),d:new Date().toISOString().slice(0,16).replace('T',' '),where:document.querySelector('h2')?.textContent||''});localStorage.setItem(NOTES_KEY,JSON.stringify(nts));toastMsg('Note ajoutée ('+nts.length+')');},'ajouter');}
+function copyNotes(){const nts=loadNotes();if(!nts.length){toastMsg('Aucune note');return}navigator.clipboard.writeText('Notes de modif — '+(typeof TOOL!=='undefined'?TOOL:'')+'\n\n'+nts.map(n=>`[${n.d}] ${n.where}\n${n.t}`).join('\n\n')).then(()=>toastMsg(nts.length+' notes copiées'));}
+function clearNotes(){if(confirm('Effacer les notes de modif ?')){localStorage.removeItem(NOTES_KEY);toastMsg('Notes effacées')}}
+function toastMsg(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>{t.classList.remove('show');t.textContent='Copié'},1600)}
+// prénom pour les gabarits
+function prenom(){const c=(vals.contact||'').trim();return c?c.split(/\s+/)[0]:'[prénom]';}
+function fill(s){saveVals();return s.replace(/\[prénom\]/g,prenom()).replace(/\[Entreprise\]/g,vals.entreprise||'[Entreprise]').replace(/\[entreprise\]/g,vals.entreprise||'[entreprise]').replace(/\[date rdv\]/g,vals.rdv||'[date rdv]').replace(/\[devoir\]/g,vals.devoir||'[devoir]').replace(/\[pain\]/g,vals.pain||'[pain]');}
+
+restore();renderFields();renderRecMini();setMode('diag');
+document.getElementById('pasteBtn').onclick=pasteBrief;document.getElementById('newBtn').onclick=resetAll;document.getElementById('noteBtn').onclick=addNote;document.getElementById('notesCopy').onclick=copyNotes;document.getElementById('notesClear').onclick=clearNotes;
+</script>
+</body>
+</html>
